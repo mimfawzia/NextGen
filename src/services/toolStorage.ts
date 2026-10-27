@@ -5,7 +5,8 @@ import {
   TutorialItem, 
   IncomeGuideItem, 
   ArticleItem, 
-  AdminUser 
+  AdminUser,
+  PromptItem 
 } from '../types';
 
 import { 
@@ -14,7 +15,8 @@ import {
   INITIAL_CATEGORIES, 
   INITIAL_TUTORIALS, 
   INITIAL_INCOME_GUIDES, 
-  INITIAL_ARTICLES 
+  INITIAL_ARTICLES,
+  INITIAL_PROMPTS 
 } from '../data/initialTools';
 
 const TOOLS_STORAGE_KEY = 'nextgen_ai_tools_db_v3';
@@ -23,6 +25,7 @@ const CATEGORIES_STORAGE_KEY = 'nextgen_ai_categories_v3';
 const TUTORIALS_STORAGE_KEY = 'nextgen_ai_tutorials_v3';
 const GUIDES_STORAGE_KEY = 'nextgen_ai_income_guides_v3';
 const ARTICLES_STORAGE_KEY = 'nextgen_ai_articles_v3';
+const PROMPTS_STORAGE_KEY = 'nextgen_ai_prompts_v3';
 const ADMIN_SESSION_TOKEN_KEY = 'nextgen_admin_session_token';
 const ADMIN_USER_KEY = 'nextgen_admin_profile';
 
@@ -621,6 +624,116 @@ export class ToolStorageService {
     return false;
   }
 
+  // ================= PROMPTS VAULT =================
+
+  static async fetchPrompts(): Promise<{
+    locked: boolean;
+    isAuthenticated: boolean;
+    prompts?: PromptItem[];
+    teasers?: any[];
+    message?: string;
+    count?: number;
+    categories?: string[];
+  }> {
+    const token = this.getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const res = await fetch('/api/prompts', { headers });
+      if (!res.ok) {
+        return { locked: true, isAuthenticated: false, message: 'Failed to retrieve prompts from server.' };
+      }
+      const data = await res.json();
+      if (!data.locked && data.prompts) {
+        localStorage.setItem(PROMPTS_STORAGE_KEY, JSON.stringify(data.prompts));
+      }
+      return data;
+    } catch {
+      // Offline fallback: if logged in as admin, check local cache
+      const cached = localStorage.getItem(PROMPTS_STORAGE_KEY);
+      if (this.isAdminLoggedIn() && cached) {
+        try {
+          return { locked: false, isAuthenticated: true, prompts: JSON.parse(cached) };
+        } catch {}
+      }
+      return { 
+        locked: true, 
+        isAuthenticated: false, 
+        message: 'Prompts Vault is protected. Log in with admin credentials to access.' 
+      };
+    }
+  }
+
+  static getCachedPrompts(): PromptItem[] {
+    try {
+      const data = localStorage.getItem(PROMPTS_STORAGE_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  static async savePrompt(prompt: Partial<PromptItem> & { title: string; promptText: string }): Promise<{ success: boolean; prompt?: PromptItem; message?: string }> {
+    const token = this.getAuthToken();
+    if (!token) return { success: false, message: 'Administrator authentication required.' };
+
+    try {
+      const res = await fetch('/api/admin/prompts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(prompt)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, message: data.error || 'Failed to save prompt.' };
+      }
+
+      // Update cached prompts if present
+      const cached = this.getCachedPrompts();
+      const idx = cached.findIndex(p => p.id === data.id);
+      if (idx >= 0) {
+        cached[idx] = data;
+      } else {
+        cached.push(data);
+      }
+      localStorage.setItem(PROMPTS_STORAGE_KEY, JSON.stringify(cached));
+
+      notifyListeners();
+      return { success: true, prompt: data };
+    } catch {
+      return { success: false, message: 'Server communication error.' };
+    }
+  }
+
+  static async deletePrompt(id: string): Promise<boolean> {
+    const token = this.getAuthToken();
+    if (!token) return false;
+
+    try {
+      const res = await fetch(`/api/admin/prompts/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const cached = this.getCachedPrompts().filter(p => p.id !== id);
+        localStorage.setItem(PROMPTS_STORAGE_KEY, JSON.stringify(cached));
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   // ================= SETTINGS =================
 
   static getSettings(): SiteSettings {
@@ -670,12 +783,16 @@ export class ToolStorageService {
   // ================= SECURE BACKEND AUTHENTICATION =================
 
   static getAuthToken(): string | null {
-    return sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY) || localStorage.getItem(ADMIN_SESSION_TOKEN_KEY);
+    const local = localStorage.getItem(ADMIN_SESSION_TOKEN_KEY);
+    if (local && local.trim()) return local.trim();
+    const session = sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY);
+    if (session && session.trim()) return session.trim();
+    return null;
   }
 
   static getAdminUser(): AdminUser | null {
     try {
-      const raw = sessionStorage.getItem(ADMIN_USER_KEY) || localStorage.getItem(ADMIN_USER_KEY);
+      const raw = localStorage.getItem(ADMIN_USER_KEY) || sessionStorage.getItem(ADMIN_USER_KEY);
       if (!raw) return null;
       return JSON.parse(raw);
     } catch {
@@ -688,9 +805,77 @@ export class ToolStorageService {
     return !!token;
   }
 
+  static clearSession(): void {
+    localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_USER_KEY);
+    sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+    sessionStorage.removeItem(ADMIN_USER_KEY);
+  }
+
+  // Synchronize full administrative data directly from protected /api/admin endpoints using Authorization: Bearer <token>
+  static async syncAdminDataWithServer(): Promise<{ success: boolean; error?: string }> {
+    const token = this.getAuthToken();
+    if (!token) return { success: false, error: 'No admin token' };
+
+    try {
+      const headers = { 'Authorization': `Bearer ${token}` };
+      const [toolsRes, catRes, tutRes, guideRes, artRes, settingsRes, promptsRes] = await Promise.all([
+        fetch('/api/admin/tools', { headers }),
+        fetch('/api/admin/categories', { headers }),
+        fetch('/api/admin/tutorials', { headers }),
+        fetch('/api/admin/income-guides', { headers }),
+        fetch('/api/admin/articles', { headers }),
+        fetch('/api/admin/settings', { headers }),
+        fetch('/api/admin/prompts', { headers }),
+      ]);
+
+      if (toolsRes.status === 401 || settingsRes.status === 401) {
+        this.clearSession();
+        notifyListeners();
+        return { success: false, error: 'Session expired. Please sign in again.' };
+      }
+
+      if (toolsRes.ok) {
+        const data = await toolsRes.json();
+        localStorage.setItem(TOOLS_STORAGE_KEY, JSON.stringify(data));
+      }
+      if (catRes.ok) {
+        const data = await catRes.json();
+        localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(data));
+      }
+      if (tutRes.ok) {
+        const data = await tutRes.json();
+        localStorage.setItem(TUTORIALS_STORAGE_KEY, JSON.stringify(data));
+      }
+      if (guideRes.ok) {
+        const data = await guideRes.json();
+        localStorage.setItem(GUIDES_STORAGE_KEY, JSON.stringify(data));
+      }
+      if (artRes.ok) {
+        const data = await artRes.json();
+        localStorage.setItem(ARTICLES_STORAGE_KEY, JSON.stringify(data));
+      }
+      if (promptsRes.ok) {
+        const data = await promptsRes.json();
+        localStorage.setItem(PROMPTS_STORAGE_KEY, JSON.stringify(data));
+      }
+      if (settingsRes.ok) {
+        const data = await settingsRes.json();
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(data));
+      }
+
+      notifyListeners();
+      return { success: true };
+    } catch (err) {
+      console.error('Error fetching admin data with Bearer token:', err);
+      return { success: false, error: 'Failed to synchronize with server.' };
+    }
+  }
+
   // Check backend server auth status
   static async checkAuthStatus(): Promise<{
     isConfigured: boolean;
+    adminEmail?: string | null;
     isAuthenticated: boolean;
     user: AdminUser | null;
   }> {
@@ -709,14 +894,12 @@ export class ToolStorageService {
       const data = await res.json();
       if (!data.isAuthenticated) {
         // Clear expired or invalidated session
-        sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
-        sessionStorage.removeItem(ADMIN_USER_KEY);
-        localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
-        localStorage.removeItem(ADMIN_USER_KEY);
+        this.clearSession();
       }
 
       return {
         isConfigured: data.isConfigured !== false,
+        adminEmail: data.adminEmail || null,
         isAuthenticated: !!data.isAuthenticated,
         user: data.user ? {
           email: data.user.email,
@@ -763,10 +946,10 @@ export class ToolStorageService {
         loginTime: new Date().toISOString()
       };
 
-      sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
-      sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
       localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
       localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+      sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+      sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
 
       notifyListeners();
       return { success: true };
@@ -776,7 +959,7 @@ export class ToolStorageService {
   }
 
   // Login Administrator with real server verification
-  static async loginAdmin(email: string, pass: string): Promise<{ success: boolean; message?: string }> {
+  static async loginAdmin(email: string, pass: string): Promise<{ success: boolean; message?: string; needsSetup?: boolean }> {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -791,7 +974,8 @@ export class ToolStorageService {
       if (!res.ok) {
         return { 
           success: false, 
-          message: data.error || 'Invalid email or password.' 
+          message: data.error || 'Invalid email or password.',
+          needsSetup: !!data.needsSetup
         };
       }
 
@@ -802,10 +986,10 @@ export class ToolStorageService {
         loginTime: new Date().toISOString()
       };
 
-      sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
-      sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
       localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
       localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+      sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+      sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
 
       notifyListeners();
       return { success: true };
@@ -814,6 +998,36 @@ export class ToolStorageService {
         success: false, 
         message: 'Invalid email or password.' 
       };
+    }
+  }
+
+  // Change Admin Password
+  static async changePassword(currentPassword: string, newPassword: string, confirmNewPassword: string): Promise<{ success: boolean; message?: string }> {
+    const token = this.getAuthToken();
+    if (!token) return { success: false, message: 'Administrator authentication required.' };
+
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+          confirmNewPassword
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, message: data.error || 'Failed to update password.' };
+      }
+
+      return { success: true, message: data.message || 'Password changed successfully.' };
+    } catch {
+      return { success: false, message: 'Server communication error.' };
     }
   }
 
@@ -831,10 +1045,7 @@ export class ToolStorageService {
       }
     }
 
-    sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
-    sessionStorage.removeItem(ADMIN_USER_KEY);
-    localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
-    localStorage.removeItem(ADMIN_USER_KEY);
+    this.clearSession();
     notifyListeners();
   }
 }

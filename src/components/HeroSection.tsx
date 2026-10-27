@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, X, Sparkles, ArrowRight, BookOpen, Compass, ShieldCheck } from 'lucide-react';
 import { SiteSettings } from '../types';
+import { CoverPhotoBanner } from './CoverPhotoBanner';
 
 interface HeroSectionProps {
   settings: SiteSettings;
@@ -10,6 +11,7 @@ interface HeroSectionProps {
   onExploreTools: () => void;
   onExploreIncomeGuides: () => void;
   onTagClick?: (tag: string) => void;
+  onUpdateSettings?: (settings: SiteSettings) => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
@@ -19,7 +21,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onClearSearch,
   onExploreTools,
   onExploreIncomeGuides,
-  onTagClick
+  onTagClick,
+  onUpdateSettings
 }) => {
   const quickTags = [
     'Writing & Chat',
@@ -30,7 +33,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   ];
 
   return (
-    <section className="relative overflow-hidden bg-white pt-12 pb-16 sm:pt-20 sm:pb-24 border-b border-[#E8ECF4]">
+    <div className="w-full flex flex-col">
+      {/* 1. Colorful and Adjustable Cover Photo Banner */}
+      <CoverPhotoBanner 
+        settings={settings} 
+        onUpdateSettings={onUpdateSettings} 
+      />
+
+      <section className="relative overflow-hidden bg-white pt-10 pb-16 sm:pt-16 sm:pb-20 border-b border-[#E8ECF4]">
       {/* Subtle Purple-Blue Ambient Background Glow */}
       <div 
         className="pointer-events-none absolute -top-24 left-1/2 h-[420px] w-[800px] -translate-x-1/2 rounded-full opacity-60 blur-[100px]"
@@ -218,5 +228,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         </div>
       </div>
     </section>
+    </div>
   );
 };

@@ -6,7 +6,8 @@ import {
   CategoryItem, 
   TutorialItem, 
   IncomeGuideItem, 
-  ArticleItem 
+  ArticleItem,
+  PromptItem 
 } from '../types';
 import { 
   INITIAL_TOOLS, 
@@ -14,7 +15,8 @@ import {
   INITIAL_CATEGORIES, 
   INITIAL_TUTORIALS, 
   INITIAL_INCOME_GUIDES, 
-  INITIAL_ARTICLES 
+  INITIAL_ARTICLES,
+  INITIAL_PROMPTS 
 } from '../data/initialTools';
 
 interface AdminRecord {
@@ -32,6 +34,7 @@ interface ServerDatabase {
   tutorials: TutorialItem[];
   incomeGuides: IncomeGuideItem[];
   articles: ArticleItem[];
+  prompts: PromptItem[];
   settings: SiteSettings;
 }
 
@@ -53,7 +56,11 @@ class DatabaseManager {
 
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (!parsed.prompts || !Array.isArray(parsed.prompts) || parsed.prompts.length === 0) {
+          parsed.prompts = INITIAL_PROMPTS;
+        }
+        return parsed;
       }
     } catch (err) {
       console.error('Failed to load database from disk, using initial state:', err);
@@ -67,6 +74,7 @@ class DatabaseManager {
       tutorials: INITIAL_TUTORIALS,
       incomeGuides: INITIAL_INCOME_GUIDES,
       articles: INITIAL_ARTICLES,
+      prompts: INITIAL_PROMPTS,
       settings: INITIAL_SITE_SETTINGS
     };
 
@@ -103,6 +111,14 @@ class DatabaseManager {
       createdAt: new Date().toISOString()
     };
     this.persist();
+  }
+
+  public updateAdminPassword(salt: string, hash: string): void {
+    if (this.data.admin) {
+      this.data.admin.salt = salt;
+      this.data.admin.hash = hash;
+      this.persist();
+    }
   }
 
   public updateLastLogin(): void {
@@ -356,14 +372,64 @@ class DatabaseManager {
     return false;
   }
 
+  // ================= PROMPTS VAULT =================
+
+  public getPrompts(includeUnpublished = false): PromptItem[] {
+    const list = this.data.prompts || INITIAL_PROMPTS;
+    if (includeUnpublished) return list;
+    return list.filter(p => p.isPublished);
+  }
+
+  public getPromptById(id: string): PromptItem | undefined {
+    const list = this.data.prompts || INITIAL_PROMPTS;
+    return list.find(p => p.id === id);
+  }
+
+  public savePrompt(prompt: PromptItem): PromptItem {
+    if (!this.data.prompts) {
+      this.data.prompts = [...INITIAL_PROMPTS];
+    }
+    const all = this.data.prompts;
+    const now = new Date().toISOString();
+    const idx = all.findIndex(p => p.id === prompt.id);
+    let saved: PromptItem;
+    if (idx >= 0) {
+      saved = { ...prompt, updatedAt: now };
+      all[idx] = saved;
+    } else {
+      saved = {
+        ...prompt,
+        id: prompt.id || `prompt-${Date.now()}`,
+        createdAt: now,
+        updatedAt: now
+      };
+      all.push(saved);
+    }
+    this.persist();
+    return saved;
+  }
+
+  public deletePrompt(id: string): boolean {
+    if (!this.data.prompts) {
+      this.data.prompts = [...INITIAL_PROMPTS];
+    }
+    const initialLen = this.data.prompts.length;
+    this.data.prompts = this.data.prompts.filter(p => p.id !== id);
+    if (this.data.prompts.length !== initialLen) {
+      this.persist();
+      return true;
+    }
+    return false;
+  }
+
   // ================= SETTINGS =================
 
   public getSettings(): SiteSettings {
-    return this.data.settings;
+    return { ...INITIAL_SITE_SETTINGS, ...this.data.settings };
   }
 
   public saveSettings(newSettings: Partial<SiteSettings>): SiteSettings {
-    this.data.settings = { ...this.data.settings, ...newSettings };
+    this.data.settings = { ...INITIAL_SITE_SETTINGS, ...this.data.settings, ...newSettings };
     this.persist();
     return this.data.settings;
   }

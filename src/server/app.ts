@@ -95,6 +95,48 @@ app.get('/api/public/settings', (_req: Request, res: Response) => {
   res.json(serverDb.getSettings());
 });
 
+// ================= EXCLUSIVE PROMPTS VAULT =================
+// Only users authenticated with admin credentials can receive full promptText and templates
+app.get('/api/prompts', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.replace(/^Bearer\s+/i, '').trim();
+  const session = verifySession(token);
+  const allPrompts = serverDb.getPrompts(false);
+
+  if (session && session.role === 'admin') {
+    // Authenticated admin: return complete prompt templates, variables, and tips
+    res.json({
+      locked: false,
+      isAuthenticated: true,
+      prompts: allPrompts
+    });
+    return;
+  }
+
+  // Unauthenticated: Return locked teaser payload with NO promptText or variables
+  const categories = Array.from(new Set(allPrompts.map(p => p.category)));
+  const teasers = allPrompts.map(p => ({
+    id: p.id,
+    title: p.title,
+    description: p.description,
+    category: p.category,
+    targetAi: p.targetAi,
+    tags: p.tags,
+    order: p.order,
+    isExclusiveAdmin: p.isExclusiveAdmin,
+    variableCount: p.variables ? p.variables.length : 0
+  }));
+
+  res.json({
+    locked: true,
+    isAuthenticated: false,
+    message: 'Access restricted. Please sign in with administrator credentials (admin@nextgenai.guide) to unlock and copy these prompts.',
+    count: allPrompts.length,
+    categories,
+    teasers
+  });
+});
+
 // ================= AUTHENTICATION ENDPOINTS =================
 
 // Check auth state & initialization status
@@ -102,9 +144,11 @@ app.get('/api/auth/status', (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.replace(/^Bearer\s+/i, '').trim();
   const session = verifySession(token);
+  const admin = serverDb.getAdmin();
 
   res.json({
     isConfigured: serverDb.isAdminConfigured(),
+    adminEmail: admin ? admin.email : null,
     isAuthenticated: !!session,
     user: session ? { email: session.email, role: session.role } : null
   });
@@ -168,7 +212,8 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
 
   if (!serverDb.isAdminConfigured()) {
     res.status(400).json({ 
-      error: 'Initial administrator setup is required. Please set up the administrator account first.' 
+      error: 'Administrator account has not been initialized yet. Please complete initial administrator setup.',
+      needsSetup: true 
     });
     return;
   }
@@ -232,6 +277,37 @@ app.get('/api/auth/session', (req: Request, res: Response) => {
       role: session.role
     }
   });
+});
+
+// Change Password (Requires Active Administrator Session)
+app.post('/api/auth/change-password', requireAdminAuth, (req: Request, res: Response) => {
+  const { currentPassword, newPassword, confirmNewPassword } = req.body;
+  const admin = serverDb.getAdmin();
+
+  if (!admin) {
+    res.status(404).json({ error: 'Administrator account not found.' });
+    return;
+  }
+
+  if (!currentPassword || !verifyPassword(currentPassword, admin.salt, admin.hash)) {
+    res.status(401).json({ error: 'Current password verification failed.' });
+    return;
+  }
+
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+    res.status(400).json({ error: 'New password must be at least 8 characters long.' });
+    return;
+  }
+
+  if (newPassword !== confirmNewPassword) {
+    res.status(400).json({ error: 'New passwords do not match.' });
+    return;
+  }
+
+  const { salt, hash } = hashPassword(newPassword);
+  serverDb.updateAdminPassword(salt, hash);
+
+  res.json({ success: true, message: 'Password updated successfully.' });
 });
 
 // Logout
@@ -369,4 +445,27 @@ app.get('/api/admin/settings', requireAdminAuth, (_req: Request, res: Response) 
 app.post('/api/admin/settings', requireAdminAuth, (req: Request, res: Response) => {
   const saved = serverDb.saveSettings(req.body);
   res.json(saved);
+});
+
+// Prompts Management
+app.get('/api/admin/prompts', requireAdminAuth, (_req: Request, res: Response) => {
+  res.json(serverDb.getPrompts(true));
+});
+
+app.post('/api/admin/prompts', requireAdminAuth, (req: Request, res: Response) => {
+  if (!req.body.title || !req.body.promptText) {
+    res.status(400).json({ error: 'Prompt title and prompt text are required.' });
+    return;
+  }
+  const saved = serverDb.savePrompt(req.body);
+  res.json(saved);
+});
+
+app.delete('/api/admin/prompts/:id', requireAdminAuth, (req: Request, res: Response) => {
+  const ok = serverDb.deletePrompt(req.params.id);
+  if (!ok) {
+    res.status(404).json({ error: 'Prompt not found.' });
+    return;
+  }
+  res.json({ success: true });
 });

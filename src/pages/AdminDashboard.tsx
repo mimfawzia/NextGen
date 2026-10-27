@@ -27,7 +27,10 @@ import {
   Clock,
   ArrowRight,
   ShieldCheck,
-  Tag
+  Tag,
+  Palette,
+  KeyRound,
+  Sliders
 } from 'lucide-react';
 
 import { 
@@ -38,7 +41,9 @@ import {
   TutorialItem, 
   IncomeGuideItem, 
   ArticleItem,
-  AdminUser 
+  AdminUser,
+  CoverStyle,
+  PromptItem
 } from '../types';
 
 import { ToolStorageService } from '../services/toolStorage';
@@ -79,6 +84,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [tutorials, setTutorials] = useState<TutorialItem[]>([]);
   const [incomeGuides, setIncomeGuides] = useState<IncomeGuideItem[]>([]);
   const [articles, setArticles] = useState<ArticleItem[]>([]);
+  const [prompts, setPrompts] = useState<PromptItem[]>([]);
   const [settings, setSettings] = useState<SiteSettings>(ToolStorageService.getSettings());
 
   // Search filter for tables
@@ -101,25 +107,69 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Article Edit Modal
   const [editingArticle, setEditingArticle] = useState<ArticleItem | null>(null);
 
+  // Prompt Edit Modal
+  const [editingPrompt, setEditingPrompt] = useState<PromptItem | null>(null);
+  const [isNewPrompt, setIsNewPrompt] = useState(false);
+  const [promptFormTitle, setPromptFormTitle] = useState('');
+  const [promptFormCategory, setPromptFormCategory] = useState('Income & Business');
+  const [promptFormTargetAi, setPromptFormTargetAi] = useState('ChatGPT 4o');
+  const [promptFormDesc, setPromptFormDesc] = useState('');
+  const [promptFormText, setPromptFormText] = useState('');
+  const [promptFormTags, setPromptFormTags] = useState('');
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<'login' | 'setup'>('login');
 
-  const loadAllData = () => {
+  // Change Password state for Settings tab
+  const [currPass, setCurrPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmNewPass, setConfirmNewPass] = useState('');
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  const [changePassError, setChangePassError] = useState('');
+  const [changePassSuccess, setChangePassSuccess] = useState('');
+
+  const loadAllData = async () => {
+    // 1. Initial cached state
     setTools(ToolStorageService.getTools(true));
     setCategories(ToolStorageService.getCategories());
     setTutorials(ToolStorageService.getTutorials(true));
     setIncomeGuides(ToolStorageService.getIncomeGuides(true));
     setArticles(ToolStorageService.getArticles(true));
+    setPrompts(ToolStorageService.getCachedPrompts());
     setSettings(ToolStorageService.getSettings());
     setAdminUser(ToolStorageService.getAdminUser());
+
+    // 2. Fetch fresh data directly from protected /api/admin/* endpoints using Authorization: Bearer <token>
+    if (ToolStorageService.isAdminLoggedIn()) {
+      const syncResult = await ToolStorageService.syncAdminDataWithServer();
+      if (syncResult.success) {
+        setTools(ToolStorageService.getTools(true));
+        setCategories(ToolStorageService.getCategories());
+        setTutorials(ToolStorageService.getTutorials(true));
+        setIncomeGuides(ToolStorageService.getIncomeGuides(true));
+        setArticles(ToolStorageService.getArticles(true));
+        setPrompts(ToolStorageService.getCachedPrompts());
+        setSettings(ToolStorageService.getSettings());
+      } else if (syncResult.error?.includes('Session expired')) {
+        showToast('Administrator session expired. Please sign in again.');
+        setAdminUser(null);
+        onNavigateAdmin('/admin/login');
+      }
+    }
   };
 
   useEffect(() => {
     ToolStorageService.syncWithServer();
     ToolStorageService.checkAuthStatus().then(status => {
       setIsConfigured(status.isConfigured);
+      if (!status.isConfigured) {
+        setAuthMode('setup');
+      }
       if (status.isAuthenticated && status.user) {
         setAdminUser(status.user);
+        loadAllData();
       } else {
         setAdminUser(null);
         if (currentAdminRoute !== '/admin/login') {
@@ -150,8 +200,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setPasswordInput('');
         showToast('Welcome back, Admin!');
         onNavigateAdmin('/admin/dashboard');
-        loadAllData();
+        await loadAllData();
       } else {
+        if (res.needsSetup) {
+          setIsConfigured(false);
+          setAuthMode('setup');
+          setSetupEmail(emailInput);
+        }
         setAuthError(res.message || 'Invalid email or password.');
       }
     } catch {
@@ -186,15 +241,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setAdminUser(ToolStorageService.getAdminUser());
         setSetupPassword('');
         setSetupConfirmPassword('');
-        showToast('Administrator account created successfully.');
+        showToast('Administrator account established successfully.');
         onNavigateAdmin('/admin/dashboard');
-        loadAllData();
+        await loadAllData();
       } else {
         setSetupError(res.message || 'Failed to create administrator account.');
       }
     } catch {
       setIsSettingUp(false);
       setSetupError('An error occurred during administrator setup.');
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsChangingPass(true);
+    setChangePassError('');
+    setChangePassSuccess('');
+
+    if (newPass.length < 8) {
+      setIsChangingPass(false);
+      setChangePassError('New password must be at least 8 characters long.');
+      return;
+    }
+
+    if (newPass !== confirmNewPass) {
+      setIsChangingPass(false);
+      setChangePassError('New passwords do not match.');
+      return;
+    }
+
+    const res = await ToolStorageService.changePassword(currPass, newPass, confirmNewPass);
+    setIsChangingPass(false);
+
+    if (res.success) {
+      setChangePassSuccess('Password changed successfully.');
+      setCurrPass('');
+      setNewPass('');
+      setConfirmNewPass('');
+      showToast('Administrator password updated.');
+    } else {
+      setChangePassError(res.message || 'Failed to change password.');
     }
   };
 
@@ -351,8 +438,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // 1. INITIAL SETUP VIEW (Shown ONLY if no administrator account exists)
-  if (!isConfigured) {
+  // AUTHENTICATION VIEW (Shown when unauthenticated or on /admin/login)
+  if (!isAuthenticated || currentAdminRoute === '/admin/login') {
+    const isShowingSetup = !isConfigured || authMode === 'setup';
+
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3">
@@ -369,193 +458,196 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <h2 className="text-2xl font-extrabold text-[#172033] tracking-tight">
-            Initial Administrator Setup
+            {isShowingSetup ? 'Initialize Administrator Account' : 'Welcome Back, Admin'}
           </h2>
           <p className="text-xs sm:text-sm text-[#64748B]">
-            Set up the administrator credentials to securely initialize your platform.
+            {isShowingSetup 
+              ? 'Set your secure administrator credentials to initialize your platform.' 
+              : 'Sign in to manage AI tools, categories, tutorials, and site settings.'}
           </p>
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
           <div className="bg-white py-8 px-6 sm:px-10 rounded-3xl border border-[#E8ECF4] shadow-xl shadow-[#172033]/5 space-y-6">
-            <form onSubmit={handleSetupFirstAdmin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
-                  Administrator Email
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={setupEmail}
-                  onChange={(e) => setSetupEmail(e.target.value)}
-                  placeholder="Enter administrator email"
-                  className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium"
-                />
+            
+            {/* Mode Switch Tabs (When unconfigured, lets admin toggle smoothly between setup and sign-in) */}
+            {!isConfigured && (
+              <div className="flex rounded-xl bg-[#F8FAFC] p-1 border border-[#E8ECF4] text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('setup'); setAuthError(''); }}
+                  className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                    authMode === 'setup' 
+                      ? 'bg-white text-[#6C5CE7] shadow-xs' 
+                      : 'text-[#64748B] hover:text-[#172033]'
+                  }`}
+                >
+                  Admin Setup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('login'); setSetupError(''); }}
+                  className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                    authMode === 'login' 
+                      ? 'bg-white text-[#6C5CE7] shadow-xs' 
+                      : 'text-[#64748B] hover:text-[#172033]'
+                  }`}
+                >
+                  Sign In
+                </button>
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
-                  Password (min 8 characters)
-                </label>
-                <div className="relative">
+            {isShowingSetup ? (
+              /* SETUP FIRST ADMIN FORM */
+              <form onSubmit={handleSetupFirstAdmin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
+                    Administrator Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={setupEmail}
+                    onChange={(e) => setSetupEmail(e.target.value)}
+                    placeholder="Enter administrator email"
+                    className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
+                    Password (min 8 characters)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      minLength={8}
+                      value={setupPassword}
+                      onChange={(e) => setSetupPassword(e.target.value)}
+                      placeholder="Create a strong password"
+                      className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#64748B] hover:text-[#172033] cursor-pointer"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
+                    Confirm Password
+                  </label>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     minLength={8}
-                    value={setupPassword}
-                    onChange={(e) => setSetupPassword(e.target.value)}
-                    placeholder="Create a strong password"
-                    className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium pr-10"
+                    value={setupConfirmPassword}
+                    onChange={(e) => setSetupConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                    className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#64748B] hover:text-[#172033] cursor-pointer"
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
-                  Confirm Password
-                </label>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  minLength={8}
-                  value={setupConfirmPassword}
-                  onChange={(e) => setSetupConfirmPassword(e.target.value)}
-                  placeholder="Re-enter password"
-                  className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium"
-                />
-              </div>
-
-              {setupError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
-                  {setupError}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSettingUp}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] hover:opacity-95 text-white text-sm font-bold shadow-md shadow-[#6C5CE7]/20 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
-              >
-                {isSettingUp ? (
-                  <span>Initializing Administrator...</span>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Establish Administrator Account</span>
-                  </>
+                {setupError && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                    {setupError}
+                  </div>
                 )}
-              </button>
-            </form>
 
-            <div className="text-center pt-2">
-              <button
-                onClick={() => onPublicNavigate('/')}
-                className="text-xs font-semibold text-[#6C5CE7] hover:underline cursor-pointer"
-              >
-                ← Return to Public Homepage
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. SECURE LOGIN PAGE VIEW
-  if (!isAuthenticated || currentAdminRoute === '/admin/login') {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3">
-          <div 
-            onClick={() => onPublicNavigate('/')}
-            className="inline-flex items-center gap-2.5 cursor-pointer group"
-          >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#6C5CE7] to-[#4285F4] text-white shadow-md shadow-[#6C5CE7]/20 group-hover:scale-105 transition-transform">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-[#172033]">
-              NextGen AI Guide
-            </span>
-          </div>
-
-          <h2 className="text-2xl font-extrabold text-[#172033] tracking-tight">
-            Welcome Back, Admin
-          </h2>
-          <p className="text-xs sm:text-sm text-[#64748B]">
-            Sign in to manage AI tools, categories, tutorials, and site settings.
-          </p>
-        </div>
-
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
-          <div className="bg-white py-8 px-6 sm:px-10 rounded-3xl border border-[#E8ECF4] shadow-xl shadow-[#172033]/5 space-y-6">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
-                  Administrator Email
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="Enter administrator email"
-                  className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
-                  Password
-                </label>
-                <div className="relative">
+                <button
+                  type="submit"
+                  disabled={isSettingUp}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] hover:opacity-95 text-white text-sm font-bold shadow-md shadow-[#6C5CE7]/20 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {isSettingUp ? (
+                    <span>Initializing Administrator...</span>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Establish Administrator Account</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              /* STANDARD LOGIN FORM */
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
+                    Administrator Email
+                  </label>
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type="email"
                     required
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium pr-10"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="Enter administrator email"
+                    className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#64748B] hover:text-[#172033] cursor-pointer"
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
                 </div>
-              </div>
 
-              {authError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
-                  {authError}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="Enter password"
+                      className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#64748B] hover:text-[#172033] cursor-pointer"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={isLoggingIn}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] hover:opacity-95 text-white text-sm font-bold shadow-md shadow-[#6C5CE7]/20 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
-              >
-                {isLoggingIn ? (
-                  <span>Authenticating...</span>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4" />
-                    <span>Sign In to Admin Dashboard</span>
-                  </>
+                {authError && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium space-y-1.5">
+                    <div>{authError}</div>
+                    {!isConfigured && (
+                      <button
+                        type="button"
+                        onClick={() => { setAuthMode('setup'); setSetupEmail(emailInput); }}
+                        className="text-xs font-bold underline cursor-pointer text-[#6C5CE7]"
+                      >
+                        Click here to set up your administrator account now →
+                      </button>
+                    )}
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] hover:opacity-95 text-white text-sm font-bold shadow-md shadow-[#6C5CE7]/20 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {isLoggingIn ? (
+                    <span>Authenticating...</span>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4" />
+                      <span>Sign In to Admin Dashboard</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
 
             <div className="text-center pt-2">
               <button
@@ -582,6 +674,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { label: 'Tutorials', path: '/admin/tutorials', key: 'tutorials', icon: BookOpen, count: tutorials.length },
     { label: 'Income Guides', path: '/admin/income-guides', key: 'income-guides', icon: DollarSign, count: incomeGuides.length },
     { label: 'Articles', path: '/admin/articles', key: 'articles', icon: FileText, count: articles.length },
+    { label: 'Prompts Vault', path: '/admin/prompts', key: 'prompts', icon: Sparkles, count: prompts.length },
     { label: 'Website Settings', path: '/admin/settings', key: 'settings', icon: SettingsIcon }
   ];
 
@@ -612,6 +705,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
             Database Live
+          </span>
+
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full bg-[#6C5CE7]/10 text-[#6C5CE7] font-bold border border-[#6C5CE7]/20" title="All protected admin endpoints attach Authorization: Bearer <token> retrieved from localStorage">
+            <Lock className="w-3 h-3" />
+            <span>Authorization: Bearer Active</span>
           </span>
         </div>
 
@@ -1254,89 +1352,611 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             {/* ROUTE 7: WEBSITE SETTINGS */}
             {activeTab === 'settings' && (
-              <div className="rounded-3xl bg-white border border-[#E8ECF4] p-6 sm:p-10 space-y-6 shadow-sm">
-                <div>
-                  <h2 className="text-2xl font-extrabold text-[#172033]">
-                    Website Brand & SEO Settings
-                  </h2>
-                  <p className="text-xs sm:text-sm text-[#64748B]">
-                    Update headlines, search placeholders, contact details, and SEO metadata.
-                  </p>
-                </div>
-
-                <form onSubmit={handleSaveSettings} className="space-y-5 max-w-2xl">
+              <div className="space-y-8">
+                {/* 1. Brand & SEO Settings Card */}
+                <div className="rounded-3xl bg-white border border-[#E8ECF4] p-6 sm:p-10 space-y-6 shadow-sm">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
-                      Brand / Platform Name
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.siteName}
-                      onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
-                      className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
-                    />
+                    <h2 className="text-2xl font-extrabold text-[#172033]">
+                      Website Brand & SEO Settings
+                    </h2>
+                    <p className="text-xs sm:text-sm text-[#64748B]">
+                      Update platform headlines, search placeholders, contact details, and public metadata.
+                    </p>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
-                      Hero Headline
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.heroHeadline}
-                      onChange={(e) => setSettings({ ...settings, heroHeadline: e.target.value })}
-                      className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
-                      Hero Subtitle
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={settings.heroSubtitle}
-                      onChange={(e) => setSettings({ ...settings, heroSubtitle: e.target.value })}
-                      className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] p-3 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <form onSubmit={handleSaveSettings} className="space-y-5 max-w-2xl">
                     <div>
                       <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
-                        Search Placeholder
+                        Brand / Platform Name
                       </label>
                       <input
                         type="text"
-                        value={settings.searchPlaceholder}
-                        onChange={(e) => setSettings({ ...settings, searchPlaceholder: e.target.value })}
+                        value={settings.siteName}
+                        onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
                         className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
-                        Contact Support Email
+                        Hero Headline
                       </label>
                       <input
-                        type="email"
-                        value={settings.contactEmail}
-                        onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })}
+                        type="text"
+                        value={settings.heroHeadline}
+                        onChange={(e) => setSettings({ ...settings, heroHeadline: e.target.value })}
                         className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
+                        Hero Subtitle
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={settings.heroSubtitle}
+                        onChange={(e) => setSettings({ ...settings, heroSubtitle: e.target.value })}
+                        className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] p-3 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
+                          Search Placeholder
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.searchPlaceholder}
+                          onChange={(e) => setSettings({ ...settings, searchPlaceholder: e.target.value })}
+                          className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
+                          Contact Support Email
+                        </label>
+                        <input
+                          type="email"
+                          value={settings.contactEmail}
+                          onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })}
+                          className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] text-white text-xs sm:text-sm font-bold shadow-md shadow-[#6C5CE7]/20 transition-all cursor-pointer inline-flex items-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>Save All Brand Settings</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* 2. Colorful & Adjustable Cover Photo (কালারফুল ও আডজাস্টেবল কভার ফটো) Card */}
+                <div className="rounded-3xl bg-white border border-[#E8ECF4] p-6 sm:p-10 space-y-6 shadow-sm">
+                  <div className="flex items-center justify-between pb-4 border-b border-[#E8ECF4]">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Palette className="w-5 h-5 text-[#6C5CE7]" />
+                        <h2 className="text-xl font-extrabold text-[#172033]">
+                          Cover Photo & Banner (কালারফুল কভার ফটো)
+                        </h2>
+                      </div>
+                      <p className="text-xs text-[#64748B] mt-1">
+                        Customize the colorful cover banner on the homepage: adjust colors, height, opacity, and custom images.
+                      </p>
+                    </div>
+
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.coverPhoto?.enabled !== false}
+                        onChange={(e) => {
+                          const updated = {
+                            ...settings,
+                            coverPhoto: {
+                              ...(settings.coverPhoto || {
+                                style: 'gradient-vibrant',
+                                height: 'medium',
+                                opacity: 90,
+                                blur: 0,
+                                title: 'Explore Next-Generation AI Intelligence',
+                                subtitle: 'Curated AI tools, guided workflows, and practical digital income strategies.',
+                                showBadges: true
+                              }),
+                              enabled: e.target.checked
+                            }
+                          };
+                          setSettings(updated);
+                          ToolStorageService.saveSettings(updated);
+                          showToast('Cover photo status updated.');
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#6C5CE7]" />
+                    </label>
                   </div>
 
-                  <div className="pt-2">
+                  {settings.coverPhoto?.enabled !== false && (
+                    <div className="space-y-6 max-w-3xl">
+                      {/* Live Visual Preview */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold uppercase text-[#172033] tracking-wider block">
+                          Live Banner Preview
+                        </span>
+                        <div 
+                          className={`w-full rounded-2xl relative overflow-hidden transition-all duration-300 flex items-center justify-center p-6 ${
+                            settings.coverPhoto?.height === 'compact' ? 'h-32' : settings.coverPhoto?.height === 'tall' ? 'h-52' : 'h-40'
+                          }`}
+                          style={{
+                            background: settings.coverPhoto?.style === 'custom-image' && settings.coverPhoto?.customImageUrl
+                              ? `url("${settings.coverPhoto.customImageUrl}") center/cover no-repeat`
+                              : settings.coverPhoto?.style === 'gradient-sunset'
+                              ? 'linear-gradient(135deg, #FF6B6B 0%, #FD79A8 30%, #6C5CE7 70%, #4285F4 100%)'
+                              : settings.coverPhoto?.style === 'gradient-aurora'
+                              ? 'linear-gradient(135deg, #00B894 0%, #0984E3 45%, #6C5CE7 85%, #55EFC4 100%)'
+                              : settings.coverPhoto?.style === 'gradient-cyber'
+                              ? 'linear-gradient(135deg, #E056FD 0%, #686DE0 40%, #30336B 80%, #22A6B3 100%)'
+                              : settings.coverPhoto?.style === 'gradient-ocean'
+                              ? 'linear-gradient(135deg, #0984E3 0%, #74B9FF 50%, #6C5CE7 100%)'
+                              : 'linear-gradient(135deg, #6C5CE7 0%, #4834D4 35%, #4285F4 70%, #00CEC9 100%)',
+                            opacity: (settings.coverPhoto?.opacity || 90) / 100,
+                            filter: settings.coverPhoto?.blur ? `blur(${settings.coverPhoto.blur}px)` : 'none'
+                          }}
+                        >
+                          <div className="text-center text-white drop-shadow-md space-y-1">
+                            <span className="text-sm sm:text-base font-extrabold block">
+                              {settings.coverPhoto?.title || 'Explore Next-Generation AI Intelligence'}
+                            </span>
+                            <span className="text-xs font-medium text-white/90 block">
+                              {settings.coverPhoto?.subtitle || 'Curated AI tools, guided workflows, and practical digital income strategies.'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Style Preset Selector */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider">
+                          Color Style Preset
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                          {[
+                            { id: 'gradient-vibrant', name: 'Vibrant Electric', grad: 'from-[#6C5CE7] to-[#00CEC9]' },
+                            { id: 'gradient-sunset', name: 'Sunset Magenta', grad: 'from-[#FF6B6B] to-[#4285F4]' },
+                            { id: 'gradient-aurora', name: 'Aurora Northern', grad: 'from-[#00B894] to-[#6C5CE7]' },
+                            { id: 'gradient-cyber', name: 'Cyberpunk Mesh', grad: 'from-[#E056FD] to-[#22A6B3]' },
+                            { id: 'gradient-ocean', name: 'Ocean Azure', grad: 'from-[#0984E3] to-[#6C5CE7]' },
+                            { id: 'custom-image', name: 'Custom Image URL', grad: 'from-[#6C5CE7] to-[#4285F4]' }
+                          ].map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                const updated = {
+                                  ...settings,
+                                  coverPhoto: {
+                                    ...(settings.coverPhoto || {
+                                      enabled: true,
+                                      height: 'medium',
+                                      opacity: 90,
+                                      blur: 0,
+                                      title: 'Explore Next-Generation AI Intelligence',
+                                      subtitle: 'Curated AI tools, guided workflows, and practical digital income strategies.',
+                                      showBadges: true
+                                    }),
+                                    style: preset.id as CoverStyle
+                                  }
+                                };
+                                setSettings(updated);
+                              }}
+                              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2.5 ${
+                                settings.coverPhoto?.style === preset.id
+                                  ? 'border-[#6C5CE7] bg-[#6C5CE7]/10 ring-2 ring-[#6C5CE7]/20 font-bold'
+                                  : 'border-[#E8ECF4] hover:border-[#6C5CE7]/30 bg-white'
+                              }`}
+                            >
+                              <div className={`w-5 h-5 rounded-lg bg-gradient-to-r ${preset.grad} shrink-0`} />
+                              <span className="text-xs text-[#172033] truncate">{preset.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Height Selector */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider">
+                          Cover Height
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['compact', 'medium', 'tall'] as const).map((h) => (
+                            <button
+                              key={h}
+                              type="button"
+                              onClick={() => {
+                                const updated = {
+                                  ...settings,
+                                  coverPhoto: {
+                                    ...(settings.coverPhoto || {
+                                      enabled: true,
+                                      style: 'gradient-vibrant',
+                                      opacity: 90,
+                                      blur: 0,
+                                      title: 'Explore Next-Generation AI Intelligence',
+                                      subtitle: 'Curated AI tools, guided workflows, and practical digital income strategies.',
+                                      showBadges: true
+                                    }),
+                                    height: h
+                                  }
+                                };
+                                setSettings(updated);
+                              }}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
+                                settings.coverPhoto?.height === h
+                                  ? 'bg-[#6C5CE7] text-white shadow-xs'
+                                  : 'bg-[#F8FAFC] text-[#64748B] hover:text-[#172033] border border-[#E8ECF4]'
+                              }`}
+                            >
+                              {h}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Sliders: Opacity & Blur */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs font-bold text-[#172033]">
+                            <span>Opacity / Intensity</span>
+                            <span className="text-[#6C5CE7]">{settings.coverPhoto?.opacity || 90}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={20}
+                            max={100}
+                            step={5}
+                            value={settings.coverPhoto?.opacity || 90}
+                            onChange={(e) => {
+                              const updated = {
+                                ...settings,
+                                coverPhoto: {
+                                  ...(settings.coverPhoto || {
+                                    enabled: true,
+                                    style: 'gradient-vibrant',
+                                    height: 'medium',
+                                    blur: 0,
+                                    title: 'Explore Next-Generation AI Intelligence',
+                                    subtitle: 'Curated AI tools, guided workflows, and practical digital income strategies.',
+                                    showBadges: true
+                                  }),
+                                  opacity: Number(e.target.value)
+                                }
+                              };
+                              setSettings(updated);
+                            }}
+                            className="w-full accent-[#6C5CE7] cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs font-bold text-[#172033]">
+                            <span>Softness / Blur</span>
+                            <span className="text-[#6C5CE7]">{settings.coverPhoto?.blur || 0}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={20}
+                            step={1}
+                            value={settings.coverPhoto?.blur || 0}
+                            onChange={(e) => {
+                              const updated = {
+                                ...settings,
+                                coverPhoto: {
+                                  ...(settings.coverPhoto || {
+                                    enabled: true,
+                                    style: 'gradient-vibrant',
+                                    height: 'medium',
+                                    opacity: 90,
+                                    title: 'Explore Next-Generation AI Intelligence',
+                                    subtitle: 'Curated AI tools, guided workflows, and practical digital income strategies.',
+                                    showBadges: true
+                                  }),
+                                  blur: Number(e.target.value)
+                                }
+                              };
+                              setSettings(updated);
+                            }}
+                            className="w-full accent-[#6C5CE7] cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Custom Image URL (When style === 'custom-image') */}
+                      {settings.coverPhoto?.style === 'custom-image' && (
+                        <div>
+                          <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
+                            Custom Image URL
+                          </label>
+                          <input
+                            type="url"
+                            value={settings.coverPhoto?.customImageUrl || ''}
+                            onChange={(e) => {
+                              const updated = {
+                                ...settings,
+                                coverPhoto: {
+                                  ...(settings.coverPhoto || {
+                                    enabled: true,
+                                    style: 'custom-image',
+                                    height: 'medium',
+                                    opacity: 90,
+                                    blur: 0,
+                                    title: 'Explore Next-Generation AI Intelligence',
+                                    subtitle: 'Curated AI tools, guided workflows, and practical digital income strategies.',
+                                    showBadges: true
+                                  }),
+                                  customImageUrl: e.target.value
+                                }
+                              };
+                              setSettings(updated);
+                            }}
+                            placeholder="https://images.unsplash.com/..."
+                            className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-xs text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      {/* Save Cover Button */}
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            ToolStorageService.saveSettings(settings);
+                            showToast('Cover photo settings saved.');
+                          }}
+                          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] text-white text-xs font-bold shadow-md shadow-[#6C5CE7]/20 transition-all cursor-pointer inline-flex items-center gap-2"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Cover Photo Changes</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Administrator Password Security Card */}
+                <div className="rounded-3xl bg-white border border-[#E8ECF4] p-6 sm:p-10 space-y-6 shadow-sm">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <KeyRound className="w-5 h-5 text-[#6C5CE7]" />
+                      <h2 className="text-xl font-extrabold text-[#172033]">
+                        Change Administrator Password
+                      </h2>
+                    </div>
+                    <p className="text-xs text-[#64748B] mt-1">
+                      Update your administrator password securely. Passwords are salted and hashed with scrypt.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
+                        Current Password
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={currPass}
+                        onChange={(e) => setCurrPass(e.target.value)}
+                        placeholder="Enter current password"
+                        className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
+                        New Password (min 8 characters)
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        value={newPass}
+                        onChange={(e) => setNewPass(e.target.value)}
+                        placeholder="Create strong new password"
+                        className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-[#172033] mb-1">
+                        Confirm New Password
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        value={confirmNewPass}
+                        onChange={(e) => setConfirmNewPass(e.target.value)}
+                        placeholder="Re-enter new password"
+                        className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-2.5 text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                      />
+                    </div>
+
+                    {changePassError && (
+                      <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                        {changePassError}
+                      </div>
+                    )}
+
+                    {changePassSuccess && (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+                        {changePassSuccess}
+                      </div>
+                    )}
+
                     <button
                       type="submit"
-                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] text-white text-xs sm:text-sm font-bold shadow-md shadow-[#6C5CE7]/20 transition-all cursor-pointer inline-flex items-center gap-2"
+                      disabled={isChangingPass}
+                      className="px-5 py-2.5 rounded-xl bg-[#172033] hover:bg-black text-white text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-2 disabled:opacity-60"
                     >
-                      <Save className="w-4 h-4" />
-                      <span>Save All Settings</span>
+                      {isChangingPass ? (
+                        <span>Updating Password...</span>
+                      ) : (
+                        <>
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>Update Password</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* ROUTE: PROMPTS VAULT MANAGEMENT */}
+            {activeTab === 'prompts' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-extrabold text-[#172033]">
+                      VIP Prompts Vault Management
+                    </h2>
+                    <p className="text-xs sm:text-sm text-[#64748B]">
+                      Manage exclusive master prompts accessible only by authenticated administrators (<span className="text-[#6C5CE7] font-semibold">admin@nextgenai.guide</span>).
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onPublicNavigate('/prompts')}
+                      className="px-4 py-2.5 rounded-xl bg-white border border-[#E8ECF4] text-xs font-bold text-[#172033] hover:text-[#6C5CE7] hover:border-[#6C5CE7]/30 transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>View Public Vault</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsNewPrompt(true);
+                        setPromptFormTitle('');
+                        setPromptFormCategory('Income & Business');
+                        setPromptFormTargetAi('ChatGPT 4o');
+                        setPromptFormDesc('');
+                        setPromptFormText('');
+                        setPromptFormTags('Sales, Client Acquisition');
+                        setEditingPrompt({
+                          id: '',
+                          title: '',
+                          category: 'Income & Business',
+                          targetAi: 'ChatGPT 4o',
+                          description: '',
+                          promptText: '',
+                          tags: ['AI Prompt'],
+                          order: prompts.length + 1,
+                          isPublished: true,
+                          isExclusiveAdmin: true,
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString()
+                        });
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] text-white text-xs font-bold shadow-md shadow-[#6C5CE7]/20 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Master Prompt</span>
                     </button>
                   </div>
-                </form>
+                </div>
+
+                {/* Prompts Grid */}
+                <div className="space-y-4">
+                  {prompts.map((p) => (
+                    <div
+                      key={p.id}
+                      className="p-5 sm:p-6 rounded-2xl bg-white border border-[#E8ECF4] shadow-xs space-y-4 hover:border-[#6C5CE7]/30 transition-colors"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#6C5CE7]/10 text-[#6C5CE7]">
+                              {p.targetAi}
+                            </span>
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                              {p.category}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>Admin-Only</span>
+                            </span>
+                          </div>
+                          <h3 className="text-base font-bold text-[#172033]">{p.title}</h3>
+                          <p className="text-xs text-[#64748B]">{p.description}</p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              setIsNewPrompt(false);
+                              setPromptFormTitle(p.title);
+                              setPromptFormCategory(p.category);
+                              setPromptFormTargetAi(p.targetAi);
+                              setPromptFormDesc(p.description);
+                              setPromptFormText(p.promptText);
+                              setPromptFormTags((p.tags || []).join(', '));
+                              setEditingPrompt(p);
+                            }}
+                            className="p-2 rounded-lg text-slate-600 hover:text-[#6C5CE7] hover:bg-[#F8FAFC] border border-[#E8ECF4] cursor-pointer"
+                            title="Edit Prompt"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (confirm(`Delete prompt "${p.title}"?`)) {
+                                const ok = await ToolStorageService.deletePrompt(p.id);
+                                if (ok) {
+                                  setPrompts(prev => prev.filter(x => x.id !== p.id));
+                                  showToast('Prompt removed.');
+                                }
+                              }
+                            }}
+                            className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 cursor-pointer"
+                            title="Delete Prompt"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Code Instruction Preview */}
+                      <div className="p-3.5 rounded-xl bg-[#0F172A] text-slate-200 text-xs font-mono max-h-32 overflow-y-auto leading-relaxed border border-slate-800">
+                        {p.promptText}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-[#64748B]">
+                        <span>Variables: {p.variables?.length || 0} dynamic fields</span>
+                        <div className="flex items-center gap-1.5">
+                          {(p.tags || []).map(t => (
+                            <span key={t} className="px-1.5 py-0.5 rounded bg-slate-100">#{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {prompts.length === 0 && (
+                    <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-[#E8ECF4] p-6 text-sm text-[#64748B]">
+                      No prompts found in the database. Click &ldquo;Add Master Prompt&rdquo; to create your first one.
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </main>
@@ -1533,6 +2153,189 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Confirm Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT / CREATE PROMPT */}
+      {editingPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white border border-[#E8ECF4] shadow-2xl p-6 sm:p-8 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-[#E8ECF4]">
+              <h3 className="text-xl font-bold text-[#172033]">
+                {isNewPrompt ? 'Add VIP Master Prompt' : `Edit Prompt: ${promptFormTitle || editingPrompt.title}`}
+              </h3>
+              <button
+                onClick={() => setEditingPrompt(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!promptFormTitle.trim() || !promptFormText.trim()) return;
+                setIsSavingPrompt(true);
+
+                const tagArray = promptFormTags.split(',').map(t => t.trim()).filter(Boolean);
+                const varMatches = Array.from(new Set(promptFormText.match(/\[([A-Z0-9_]+)\]/g) || []));
+                const extractedVariables = varMatches.map(m => {
+                  const key = m.replace(/[\[\]]/g, '');
+                  return {
+                    key,
+                    label: key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()),
+                    placeholder: `Enter ${key.toLowerCase().replace(/_/g, ' ')}`
+                  };
+                });
+
+                const payload = {
+                  id: editingPrompt.id || undefined,
+                  title: promptFormTitle.trim(),
+                  category: promptFormCategory,
+                  targetAi: promptFormTargetAi,
+                  description: promptFormDesc.trim() || 'Curated high-performance master prompt.',
+                  promptText: promptFormText.trim(),
+                  variables: extractedVariables,
+                  tags: tagArray.length > 0 ? tagArray : ['AI Prompt'],
+                  order: editingPrompt.order || prompts.length + 1,
+                  isPublished: true,
+                  isExclusiveAdmin: true
+                };
+
+                const res = await ToolStorageService.savePrompt(payload);
+                setIsSavingPrompt(false);
+                if (res.success && res.prompt) {
+                  showToast(isNewPrompt ? 'Master prompt created.' : 'Master prompt updated.');
+                  setEditingPrompt(null);
+                  setPrompts(prev => {
+                    const idx = prev.findIndex(p => p.id === res.prompt!.id);
+                    if (idx >= 0) {
+                      const copy = [...prev];
+                      copy[idx] = res.prompt!;
+                      return copy;
+                    }
+                    return [res.prompt!, ...prev];
+                  });
+                } else {
+                  showToast(res.message || 'Failed to save prompt.');
+                }
+              }}
+              className="space-y-4 pt-3"
+            >
+              <div>
+                <label className="block text-xs font-bold text-[#172033] mb-1">
+                  Prompt Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={promptFormTitle}
+                  onChange={(e) => setPromptFormTitle(e.target.value)}
+                  placeholder="e.g. High-Ticket B2B Cold Outreach Generator"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F8FAFC] border border-[#E8ECF4] text-xs sm:text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#172033] mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={promptFormCategory}
+                    onChange={(e) => setPromptFormCategory(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#F8FAFC] border border-[#E8ECF4] text-xs text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                  >
+                    <option value="Income & Business">Income & Business</option>
+                    <option value="Coding & Architecture">Coding & Architecture</option>
+                    <option value="Midjourney & Visuals">Midjourney & Visuals</option>
+                    <option value="Copywriting & Content">Copywriting & Content</option>
+                    <option value="SEO & Growth">SEO & Growth</option>
+                    <option value="General">General</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#172033] mb-1">
+                    Target AI Model
+                  </label>
+                  <select
+                    value={promptFormTargetAi}
+                    onChange={(e) => setPromptFormTargetAi(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#F8FAFC] border border-[#E8ECF4] text-xs text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                  >
+                    <option value="ChatGPT 4o">ChatGPT 4o</option>
+                    <option value="Claude 3.5 Sonnet">Claude 3.5 Sonnet</option>
+                    <option value="Midjourney v6">Midjourney v6</option>
+                    <option value="Gemini 1.5 Pro">Gemini 1.5 Pro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#172033] mb-1">
+                  Short Description
+                </label>
+                <input
+                  type="text"
+                  value={promptFormDesc}
+                  onChange={(e) => setPromptFormDesc(e.target.value)}
+                  placeholder="Summarize the core outcome of this prompt..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F8FAFC] border border-[#E8ECF4] text-xs sm:text-sm text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[#172033]">
+                    Prompt Template Text *
+                  </label>
+                  <span className="text-[11px] text-[#6C5CE7] font-semibold">
+                    Tip: Use [VARIABLE_NAME] for dynamic placeholders
+                  </span>
+                </div>
+                <textarea
+                  required
+                  rows={6}
+                  value={promptFormText}
+                  onChange={(e) => setPromptFormText(e.target.value)}
+                  placeholder="Act as a world-class copywriter... Write an offer for [TARGET_INDUSTRY]..."
+                  className="w-full p-3.5 rounded-xl bg-[#0F172A] text-slate-100 font-mono text-xs border border-slate-800 focus:border-[#6C5CE7] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#172033] mb-1">
+                  Tags (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={promptFormTags}
+                  onChange={(e) => setPromptFormTags(e.target.value)}
+                  placeholder="Sales, Email, Outreach, Freelance"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F8FAFC] border border-[#E8ECF4] text-xs text-[#172033] focus:border-[#6C5CE7] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E8ECF4]">
+                <button
+                  type="button"
+                  onClick={() => setEditingPrompt(null)}
+                  className="px-4 py-2 rounded-xl bg-[#F8FAFC] text-xs font-bold text-[#64748B] hover:text-[#172033] border border-[#E8ECF4]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPrompt}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] text-white text-xs font-bold hover:opacity-95 shadow-md shadow-[#6C5CE7]/20 disabled:opacity-60"
+                >
+                  {isSavingPrompt ? 'Saving...' : 'Save Master Prompt'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

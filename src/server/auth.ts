@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // Password Hashing using scrypt + salt
 export function hashPassword(password: string): { salt: string; hash: string } {
@@ -28,29 +30,67 @@ export interface ActiveSession {
   expiresAt: number;
 }
 
-const activeSessions = new Map<string, ActiveSession>();
-const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+const DATA_DIR = path.resolve(process.cwd(), 'data');
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function loadSessions(): Map<string, ActiveSession> {
+  const map = new Map<string, ActiveSession>();
+  try {
+    if (fs.existsSync(SESSIONS_FILE)) {
+      const raw = fs.readFileSync(SESSIONS_FILE, 'utf-8');
+      const data = JSON.parse(raw);
+      const now = Date.now();
+      for (const [token, session] of Object.entries(data)) {
+        const s = session as ActiveSession;
+        if (s && s.expiresAt > now) {
+          map.set(token, s);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load persisted sessions:', err);
+  }
+  return map;
+}
+
+const activeSessions: Map<string, ActiveSession> = loadSessions();
+
+function persistSessions(): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const obj = Object.fromEntries(activeSessions.entries());
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(obj, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to write sessions to disk:', err);
+  }
+}
 
 export function createSession(email: string): ActiveSession {
   const token = crypto.randomBytes(32).toString('hex');
   const now = Date.now();
   const session: ActiveSession = {
     token,
-    email,
+    email: email.toLowerCase().trim(),
     role: 'admin',
     createdAt: now,
     expiresAt: now + SESSION_TTL_MS
   };
   activeSessions.set(token, session);
+  persistSessions();
   return session;
 }
 
 export function verifySession(token: string | undefined): ActiveSession | null {
   if (!token) return null;
-  const session = activeSessions.get(token);
+  const cleanToken = token.trim();
+  const session = activeSessions.get(cleanToken);
   if (!session) return null;
   if (Date.now() > session.expiresAt) {
-    activeSessions.delete(token);
+    activeSessions.delete(cleanToken);
+    persistSessions();
     return null;
   }
   return session;
@@ -58,7 +98,12 @@ export function verifySession(token: string | undefined): ActiveSession | null {
 
 export function destroySession(token: string | undefined): boolean {
   if (!token) return false;
-  return activeSessions.delete(token);
+  const cleanToken = token.trim();
+  const deleted = activeSessions.delete(cleanToken);
+  if (deleted) {
+    persistSessions();
+  }
+  return deleted;
 }
 
 // Rate Limiting (Brute-force protection)

@@ -14,7 +14,8 @@ import {
   Shield, 
   Clock, 
   ChevronRight,
-  HelpCircle
+  HelpCircle,
+  Lock
 } from 'lucide-react';
 import { CategoryItem, TutorialItem, IncomeGuideItem } from '../types';
 
@@ -267,7 +268,45 @@ export const HomeSections: React.FC<HomeSectionsProps> = ({
         </div>
       </section>
 
-      {/* 5. Why NextGen AI Guide? */}
+      {/* 5. VIP Prompts Vault Spotlight */}
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="rounded-3xl bg-gradient-to-br from-[#1E1B4B] via-[#0F172A] to-[#1E293B] p-8 sm:p-12 text-white shadow-xl shadow-[#6C5CE7]/10 relative overflow-hidden">
+          <div className="pointer-events-none absolute top-0 right-0 w-80 h-80 bg-[#6C5CE7]/20 rounded-full blur-3xl" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="space-y-3 max-w-xl">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-purple-200 text-xs font-semibold backdrop-blur-xs border border-white/10">
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Protected VIP Resource</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                VIP AI Prompts Vault (এক্সক্লুসিভ প্রম্পট ভল্ট)
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Unlock battle-tested master prompts for high-ticket client acquisition, full-stack software architecture, Midjourney commercial photography, and programmatic SEO. Access is strictly protected for verified administrators.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-slate-300">
+                <span className="px-2 py-0.5 rounded bg-white/10">ChatGPT 4o</span>
+                <span className="px-2 py-0.5 rounded bg-white/10">Claude 3.5 Sonnet</span>
+                <span className="px-2 py-0.5 rounded bg-white/10">Midjourney v6</span>
+                <span className="px-2 py-0.5 rounded bg-white/10">Dynamic Variables</span>
+              </div>
+            </div>
+
+            <div className="shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <button
+                onClick={() => onNavigate('/prompts')}
+                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] hover:opacity-95 text-white text-xs sm:text-sm font-bold shadow-lg shadow-[#6C5CE7]/30 transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+              >
+                <span>Enter VIP Prompts Vault</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. Why NextGen AI Guide? */}
       <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="rounded-3xl bg-white border border-[#E8ECF4] p-8 sm:p-12 shadow-sm space-y-10">
           <div className="text-center max-w-2xl mx-auto space-y-2">

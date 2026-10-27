@@ -17,6 +17,7 @@ import { HowToUsePage } from './pages/HowToUsePage';
 import { IncomeGuidesPage } from './pages/IncomeGuidesPage';
 import { TutorialsPage } from './pages/TutorialsPage';
 import { AboutPage } from './pages/AboutPage';
+import { PromptsVault } from './pages/PromptsVault';
 import { AdminDashboard } from './pages/AdminDashboard';
 
 // Data & Services
@@ -169,7 +170,12 @@ export default function App() {
           <AboutPage onNavigate={navigateTo} />
         )}
 
-        {/* ROUTE 7: ADMIN DASHBOARD & SUBROUTES (/admin, /admin/dashboard, /admin/tools, etc.) */}
+        {/* ROUTE 7: VIP EXCLUSIVE PROMPTS VAULT (/prompts) */}
+        {!activeToolSlug && currentPath === '/prompts' && (
+          <PromptsVault onNavigate={navigateTo} />
+        )}
+
+        {/* ROUTE 8: ADMIN DASHBOARD & SUBROUTES (/admin, /admin/dashboard, /admin/tools, etc.) */}
         {isAdminRoute && (
           <AdminDashboard 
             currentAdminRoute={currentPath}
@@ -195,6 +201,7 @@ export default function App() {
                 const el = document.getElementById('featured-section');
                 el?.scrollIntoView({ behavior: 'smooth' });
               }}
+              onUpdateSettings={(newSettings) => setSettings(newSettings)}
             />
 
             {/* Featured Tools Section */}

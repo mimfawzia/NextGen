@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Menu, X, Search, Shield, ArrowRight } from 'lucide-react';
+import { Sparkles, Menu, X, Search, Shield, ArrowRight, Lock, KeyRound } from 'lucide-react';
 import { ToolStorageService } from '../services/toolStorage';
 
 interface NavbarProps {
@@ -18,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate, onSearc
     { label: 'How to Use AI', path: '/how-to-use' },
     { label: 'AI Income Guides', path: '/income-guides' },
     { label: 'Tutorials', path: '/tutorials' },
+    { label: 'VIP Prompts', path: '/prompts', isVip: true },
     { label: 'About', path: '/about' }
   ];
 
@@ -60,13 +61,23 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate, onSearc
               <button
                 key={link.path}
                 onClick={() => handleLinkClick(link.path)}
-                className={`px-3.5 py-2 text-[13px] font-semibold rounded-lg transition-all cursor-pointer ${
+                className={`px-3.5 py-2 text-[13px] font-semibold rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                   active
                     ? 'bg-[#6C5CE7]/10 text-[#6C5CE7]'
                     : 'text-[#64748B] hover:text-[#172033] hover:bg-[#F8FAFC]'
                 }`}
               >
-                {link.label}
+                <span>{link.label}</span>
+                {link.isVip && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-0.5 ${
+                    isAdmin 
+                      ? 'bg-emerald-100 text-emerald-800' 
+                      : 'bg-purple-100 text-[#6C5CE7]'
+                  }`}>
+                    {isAdmin ? <Sparkles className="w-2.5 h-2.5" /> : <Lock className="w-2.5 h-2.5" />}
+                    <span>{isAdmin ? 'VIP' : 'VIP'}</span>
+                  </span>
+                )}
               </button>
             );
           })}
@@ -159,13 +170,23 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate, onSearc
               <button
                 key={link.path}
                 onClick={() => handleLinkClick(link.path)}
-                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-between ${
                   active
                     ? 'bg-[#6C5CE7]/10 text-[#6C5CE7]'
                     : 'text-[#64748B] hover:text-[#172033] hover:bg-[#F8FAFC]'
                 }`}
               >
-                {link.label}
+                <span>{link.label}</span>
+                {link.isVip && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 ${
+                    isAdmin 
+                      ? 'bg-emerald-100 text-emerald-800' 
+                      : 'bg-purple-100 text-[#6C5CE7]'
+                  }`}>
+                    {isAdmin ? <Sparkles className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                    <span>{isAdmin ? 'Unlocked' : 'VIP'}</span>
+                  </span>
+                )}
               </button>
             );
           })}

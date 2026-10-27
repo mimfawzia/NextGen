@@ -119,6 +119,27 @@ export interface ArticleItem {
   updatedAt: string;
 }
 
+export type CoverStyle = 
+  | 'gradient-vibrant' 
+  | 'gradient-sunset' 
+  | 'gradient-aurora' 
+  | 'gradient-cyber' 
+  | 'gradient-ocean'
+  | 'mesh-glow'
+  | 'custom-image';
+
+export interface CoverPhotoSettings {
+  enabled: boolean;
+  style: CoverStyle;
+  customImageUrl?: string;
+  height: 'compact' | 'medium' | 'tall';
+  opacity: number; // 20 - 100
+  blur: number; // 0 - 20px
+  title?: string;
+  subtitle?: string;
+  showBadges?: boolean;
+}
+
 export interface SiteSettings {
   siteName: string;
   heroHeadline: string;
@@ -133,6 +154,7 @@ export interface SiteSettings {
   socialGithub: string;
   seoTitle: string;
   seoDescription: string;
+  coverPhoto?: CoverPhotoSettings;
 }
 
 export interface AdminUser {
@@ -140,4 +162,28 @@ export interface AdminUser {
   role: string;
   token: string;
   loginTime: string;
+}
+
+export interface PromptVariable {
+  key: string;
+  label: string;
+  placeholder: string;
+  defaultValue?: string;
+}
+
+export interface PromptItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  targetAi: string; // 'ChatGPT 4o' | 'Claude 3.5 Sonnet' | 'Midjourney v6' | 'Gemini 1.5 Pro' | 'General'
+  promptText: string;
+  variables?: PromptVariable[];
+  tags: string[];
+  tips?: string[];
+  order: number;
+  isPublished: boolean;
+  isExclusiveAdmin: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -1,4 +1,12 @@
-import { ToolItem, SiteSettings, CategoryItem, TutorialItem, IncomeGuideItem, ArticleItem } from '../types';
+import { 
+  ToolItem, 
+  SiteSettings, 
+  CategoryItem, 
+  TutorialItem, 
+  IncomeGuideItem, 
+  ArticleItem, 
+  PromptItem 
+} from '../types';
 
 export const INITIAL_SITE_SETTINGS: SiteSettings = {
   siteName: 'NextGen AI Guide',
@@ -13,7 +21,18 @@ export const INITIAL_SITE_SETTINGS: SiteSettings = {
   socialTwitter: 'https://twitter.com',
   socialGithub: 'https://github.com',
   seoTitle: 'NextGen AI Guide — Discover AI. Unlock Your Potential.',
-  seoDescription: 'Explore powerful AI tools, learn step by step, and discover practical ways to build digital skills and earn online.'
+  seoDescription: 'Explore powerful AI tools, learn step by step, and discover practical ways to build digital skills and earn online.',
+  coverPhoto: {
+    enabled: true,
+    style: 'gradient-vibrant',
+    customImageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1600&q=80',
+    height: 'medium',
+    opacity: 90,
+    blur: 0,
+    title: 'Explore Next-Generation AI Intelligence',
+    subtitle: 'Curated AI tools, guided workflows, and practical digital income strategies.',
+    showBadges: true
+  }
 };
 
 export const INITIAL_TOOLS: ToolItem[] = [
@@ -921,6 +940,229 @@ For everyday brainstorming, standard accounts are sufficient. But for sensitive 
     isPublished: true,
     createdAt: '2026-10-26T00:00:00.000Z',
     updatedAt: '2026-10-26T00:00:00.000Z'
+  }
+];
+
+export const INITIAL_PROMPTS: PromptItem[] = [
+  {
+    id: 'prompt-1',
+    title: 'High-Ticket Freelance Pitch & Irresistible Offer Generator',
+    description: 'Generates a compelling, customized freelance pitch with problem diagnosis, value proposition, risk-reversal guarantee, and call-to-action.',
+    category: 'Income & Business',
+    targetAi: 'ChatGPT 4o',
+    promptText: `Act as a world-class freelance sales consultant and direct-response copywriter. I want to pitch a high-ticket client in the [TARGET_INDUSTRY] industry for my service: [MY_SERVICE].
+
+Client Situation:
+- Target Prospect Role: [CLIENT_ROLE] (e.g., Founder, Head of Growth, Marketing Director)
+- Core Pain Point: [CLIENT_PAIN_POINT] (e.g., Low conversion rates on paid traffic)
+- My Proposed Solution: [MY_PROPOSED_SOLUTION]
+- My Unique Credibility / Past Win: [MY_CREDIBILITY]
+
+Please generate:
+1. A concise, zero-fluff Cold Email (under 120 words) with a personalized hook, proof metric, and low-friction CTA (e.g. 5-min audit).
+2. A high-converting LinkedIn DM variation (under 75 words).
+3. A 3-step value-packed follow-up sequence spaced over 10 days.
+4. An Objection Handling script if they ask "What are your rates?" before getting on a call.
+
+Keep tone professional, confident, consultative, and completely free of generic buzzwords.`,
+    variables: [
+      { key: 'TARGET_INDUSTRY', label: 'Target Industry', placeholder: 'e.g. B2B SaaS, E-commerce, Real Estate' },
+      { key: 'MY_SERVICE', label: 'My Service', placeholder: 'e.g. Conversion Rate Optimization & AI Automation' },
+      { key: 'CLIENT_ROLE', label: 'Client Role', placeholder: 'e.g. Founder, CMO, VP of Sales' },
+      { key: 'CLIENT_PAIN_POINT', label: 'Client Pain Point', placeholder: 'e.g. High customer acquisition cost' },
+      { key: 'MY_PROPOSED_SOLUTION', label: 'Proposed Solution', placeholder: 'e.g. 14-day landing page redesign sprint' },
+      { key: 'MY_CREDIBILITY', label: 'Credibility / Past Win', placeholder: 'e.g. Increased checkout conversion by 34% for an e-commerce brand' }
+    ],
+    tags: ['Freelance', 'High Ticket', 'Client Acquisition', 'Cold Email', 'Sales'],
+    tips: [
+      'Tailor the credibility variable with specific numbers rather than vague statements.',
+      'Send the follow-up sequence exactly as timed to maintain respectful persistence.'
+    ],
+    order: 1,
+    isPublished: true,
+    isExclusiveAdmin: true,
+    createdAt: '2026-10-27T00:00:00.000Z',
+    updatedAt: '2026-10-27T00:00:00.000Z'
+  },
+  {
+    id: 'prompt-2',
+    title: 'Autonomous Full-Stack Architecture & Clean Code Blueprint',
+    description: 'Instructs Claude 3.5 Sonnet or Cursor to design scalable system architectures, clean TypeScript interfaces, resilient database schemas, and robust API handlers.',
+    category: 'Coding & Architecture',
+    targetAi: 'Claude 3.5 Sonnet',
+    promptText: `You are a Principal Software Architect and Senior Full-Stack Engineer. I need an architectural specification and production-grade implementation blueprint for:
+
+Feature / Application: [APPLICATION_NAME_AND_PURPOSE]
+Tech Stack: [TECH_STACK] (e.g., React 19, TypeScript, Express, PostgreSQL/Drizzle, Tailwind CSS)
+Core User Stories:
+[USER_STORIES]
+
+Requirements:
+1. Domain Model: Strict TypeScript interfaces and enums with comprehensive field annotations.
+2. Database Schema: Normalized relational schema or document structure with primary keys, indexes, and constraints.
+3. API Contract: RESTful endpoints with input validation schemas, error envelopes, and HTTP status codes.
+4. Edge Case Hardening: Concurrency handling, authorization checks, idempotency, and network failure retries.
+5. Code Example: Provide complete, pristine code for the most critical API handler and its associated database transaction. Do not use placeholders or omit error handling.`,
+    variables: [
+      { key: 'APPLICATION_NAME_AND_PURPOSE', label: 'App / Feature Purpose', placeholder: 'e.g. Multi-tenant subscription billing engine' },
+      { key: 'TECH_STACK', label: 'Tech Stack', placeholder: 'e.g. React 19, Node.js, TypeScript, PostgreSQL' },
+      { key: 'USER_STORIES', label: 'User Stories', placeholder: 'e.g. Users can subscribe, upgrade plan, receive webhook events' }
+    ],
+    tags: ['Full-Stack', 'Architecture', 'TypeScript', 'Clean Code', 'Database'],
+    tips: [
+      'Best used with Claude 3.5 Sonnet or Cursor IDE for deep architectural reasoning.',
+      'Specify your ORM and styling library in the Tech Stack parameter.'
+    ],
+    order: 2,
+    isPublished: true,
+    isExclusiveAdmin: true,
+    createdAt: '2026-10-27T00:00:00.000Z',
+    updatedAt: '2026-10-27T00:00:00.000Z'
+  },
+  {
+    id: 'prompt-3',
+    title: 'Photorealistic Midjourney v6 Cinematic Commercial Photography',
+    description: 'Generates studio-quality, ultra-realistic commercial product shots and editorial portraits with precise lighting, lens, and color grading parameters.',
+    category: 'Midjourney & Visuals',
+    targetAi: 'Midjourney v6',
+    promptText: `A commercial editorial studio photograph of [SUBJECT_DESCRIPTION], shot on Hasselblad H6D-100c, 85mm f/1.4 lens. 
+Lighting: [LIGHTING_STYLE] (e.g. soft diffuse morning sunlight with subtle rim lighting and atmospheric volumetric haze). 
+Environment: [ENVIRONMENT_SETTING] (e.g. modern minimalist architectural interior with concrete textures and warm cedar accents).
+Color Palette: [COLOR_TONES] (e.g. earthy muted tones, deep navy shadows, warm highlights).
+Composition: Rule of thirds, shallow depth of field, natural skin/surface micro-textures, authentic reflections, cinematic depth, 8k resolution, photorealistic, hyper-detailed commercial quality --ar 16:9 --style raw --v 6.1`,
+    variables: [
+      { key: 'SUBJECT_DESCRIPTION', label: 'Subject Description', placeholder: 'e.g. luxury ceramic coffee dripper pouring hot coffee' },
+      { key: 'LIGHTING_STYLE', label: 'Lighting Style', placeholder: 'e.g. Golden hour side lighting through fluted glass' },
+      { key: 'ENVIRONMENT_SETTING', label: 'Environment Setting', placeholder: 'e.g. Sleek Scandinavian marble kitchen counter' },
+      { key: 'COLOR_TONES', label: 'Color Tones', placeholder: 'e.g. Warm amber, deep charcoal, natural terracotta' }
+    ],
+    tags: ['Midjourney', 'Photography', 'Commercial', 'Product Art', 'Prompt Engineering'],
+    tips: [
+      'Copy the output directly into Discord or Midjourney web UI.',
+      'Keep --style raw to avoid Midjourney default fantasy glossiness.'
+    ],
+    order: 3,
+    isPublished: true,
+    isExclusiveAdmin: true,
+    createdAt: '2026-10-27T00:00:00.000Z',
+    updatedAt: '2026-10-27T00:00:00.000Z'
+  },
+  {
+    id: 'prompt-4',
+    title: 'Viral Thought-Leadership LinkedIn & Twitter Hook Matrix',
+    description: 'Crafts 10 high-engagement hooks, narrative structures, and takeaway lessons from any business or tech insight.',
+    category: 'Copywriting & Content',
+    targetAi: 'ChatGPT 4o',
+    promptText: `Act as a top 0.1% personal brand strategist and viral LinkedIn/Twitter ghostwriter for founders and tech executives.
+
+Core Insight / Story I Want to Share:
+[CORE_INSIGHT_OR_STORY]
+
+Target Audience:
+[TARGET_AUDIENCE] (e.g., Indie hackers, Product Managers, Agency Owners)
+
+Please provide:
+1. 10 High-Engagement Hook Options categorized by style:
+   - Contrarion / Myth Buster (challenges conventional wisdom)
+   - The Breakdown / Framework (step-by-step tactical value)
+   - The Vulnerable Case Study (failure turned into success)
+   - The Data / Observation (curated pattern recognition)
+2. A complete 250-word LinkedIn Post utilizing the strongest hook. Format with short, punchy paragraphs, bullet points for scannability, and an engaging question CTA at the end.
+3. A 5-tweet Twitter/X Thread adapting the same insight for fast scrolling.`,
+    variables: [
+      { key: 'CORE_INSIGHT_OR_STORY', label: 'Core Insight or Story', placeholder: 'e.g. Why we switched from custom code to AI micro-tools and saved 20 hours a week' },
+      { key: 'TARGET_AUDIENCE', label: 'Target Audience', placeholder: 'e.g. Solo entrepreneurs, SaaS founders, digital freelancers' }
+    ],
+    tags: ['Social Media', 'LinkedIn', 'Viral Content', 'Ghostwriting', 'Personal Brand'],
+    tips: [
+      'Focus the insight on a specific quantifiable transformation.',
+      'Check readability grade level — aim for 6th-8th grade reading level for maximum reach.'
+    ],
+    order: 4,
+    isPublished: true,
+    isExclusiveAdmin: true,
+    createdAt: '2026-10-27T00:00:00.000Z',
+    updatedAt: '2026-10-27T00:00:00.000Z'
+  },
+  {
+    id: 'prompt-5',
+    title: 'Programmatic SEO & Content Cluster Architecture Engine',
+    description: 'Generates a complete semantic topic cluster, keyword hierarchy, content briefs, and internal linking strategy to rank on Google search.',
+    category: 'SEO & Growth',
+    targetAi: 'ChatGPT 4o',
+    promptText: `You are an elite Search Engine Optimization (SEO) Director and Content Strategist. I need a comprehensive programmatic content cluster plan for:
+
+Niche / Industry: [NICHE]
+Pillar Topic: [PILLAR_TOPIC]
+Primary Search Intent: [SEARCH_INTENT] (e.g., Commercial investigation, Informational problem solving)
+Competitor URL or Focus Area: [COMPETITOR_OR_FOCUS]
+
+Deliverables:
+1. Pillar Page Blueprint: Title tag, H1, Meta Description, and comprehensive H2/H3 outline covering all semantic subtopics.
+2. 8 Supporting Cluster Articles: Low-competition, high-intent long-tail keywords that support the pillar.
+3. Internal Linking Architecture: Exact anchor text rules and directional link pathways between cluster articles and the pillar page.
+4. Schema.org recommendations: Recommended structured data types (FAQPage, HowTo, Article) with JSON-LD snippets.
+5. Featured Snippet Optimization: 4 target question queries with 45-word direct answers formatted for Position 0.`,
+    variables: [
+      { key: 'NICHE', label: 'Niche / Industry', placeholder: 'e.g. AI Tools for Remote Work & Productivity' },
+      { key: 'PILLAR_TOPIC', label: 'Pillar Topic', placeholder: 'e.g. The Ultimate Guide to AI Automation for Small Business' },
+      { key: 'SEARCH_INTENT', label: 'Search Intent', placeholder: 'e.g. Commercial investigation + Informational' },
+      { key: 'COMPETITOR_OR_FOCUS', label: 'Competitor / Focus', placeholder: 'e.g. AI workflow tutorials and free tool reviews' }
+    ],
+    tags: ['SEO', 'Content Strategy', 'Topic Cluster', 'Google Ranking', 'Organic Traffic'],
+    tips: [
+      'Use the generated FAQ snippets directly in your article schema.',
+      'Ensure every cluster article links back to the pillar with primary target anchor text.'
+    ],
+    order: 5,
+    isPublished: true,
+    isExclusiveAdmin: true,
+    createdAt: '2026-10-27T00:00:00.000Z',
+    updatedAt: '2026-10-27T00:00:00.000Z'
+  },
+  {
+    id: 'prompt-6',
+    title: 'High-Converting Sales Landing Page Copywriting (AIDA + PAS Framework)',
+    description: 'Drafts high-converting landing page copy with sticky value propositions, objection elimination, social proof framing, and compelling CTAs.',
+    category: 'Copywriting & Content',
+    targetAi: 'ChatGPT 4o',
+    promptText: `Act as a top direct-response conversion copywriter who has generated over $10M in digital product and SaaS sales. Write the full sales landing page copy for:
+
+Product Name: [PRODUCT_NAME]
+Target Audience: [TARGET_AUDIENCE]
+Price Point: [PRICE_POINT]
+Core Problem Solved: [CORE_PROBLEM]
+Key Features & Benefits: [KEY_BENEFITS]
+
+Structure the copy into these sections:
+1. Above the Fold:
+   - Eyebrow tag
+   - Irresistible H1 Headline (Under 10 words, focusing on end-result outcome)
+   - Compelling Subheadline (Clarifying who it is for and how it works)
+   - Primary Call to Action Button Text + Micro-copy reassurance
+   - 3 Social Proof badges / trust bullet points
+2. Problem Agitation (PAS Framework): Paint the costly status quo before our solution.
+3. The Solution & Unique Mechanism: Explain why standard methods fail and why [PRODUCT_NAME] works.
+4. Feature-to-Benefit Matrix: 4 core modules/features translated into emotional & financial benefits.
+5. Risk Reversal: 30-day money-back guarantee terms written to eliminate hesitation.
+6. FAQ: 5 common customer objections answered directly with clarity and confidence.`,
+    variables: [
+      { key: 'PRODUCT_NAME', label: 'Product Name', placeholder: 'e.g. NextGen AI Prompt Mastery Course & Toolkit' },
+      { key: 'TARGET_AUDIENCE', label: 'Target Audience', placeholder: 'e.g. Freelancers, Marketers, Content Creators' },
+      { key: 'PRICE_POINT', label: 'Price Point', placeholder: 'e.g. $49 one-time or $19/month' },
+      { key: 'CORE_PROBLEM', label: 'Core Problem', placeholder: 'e.g. Wasting hours getting generic, low-quality AI outputs' },
+      { key: 'KEY_BENEFITS', label: 'Key Benefits', placeholder: 'e.g. 500+ tested prompts, copy-paste workflows, client pitch scripts' }
+    ],
+    tags: ['Landing Page', 'Copywriting', 'Conversion Rate', 'AIDA', 'Digital Marketing'],
+    tips: [
+      'Fill in the specific objections your real prospects voice most frequently.',
+      'Split-test the H1 headline generated across multiple variations.'
+    ],
+    order: 6,
+    isPublished: true,
+    isExclusiveAdmin: true,
+    createdAt: '2026-10-27T00:00:00.000Z',
+    updatedAt: '2026-10-27T00:00:00.000Z'
   }
 ];
 
