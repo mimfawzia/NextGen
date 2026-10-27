@@ -59,11 +59,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   // Authentication State
   const [adminUser, setAdminUser] = useState<AdminUser | null>(() => ToolStorageService.getAdminUser());
-  const [emailInput, setEmailInput] = useState('admin@nextgenai.guide');
+  const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authError, setAuthError] = useState('');
+
+  // Initial Administrator Setup State
+  const [isConfigured, setIsConfigured] = useState(true);
+  const [setupEmail, setSetupEmail] = useState('');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
+  const [isSettingUp, setIsSettingUp] = useState(false);
+  const [setupError, setSetupError] = useState('');
 
   // Database Records
   const [tools, setTools] = useState<ToolItem[]>([]);
@@ -107,8 +115,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   useEffect(() => {
+    ToolStorageService.syncWithServer();
+    ToolStorageService.checkAuthStatus().then(status => {
+      setIsConfigured(status.isConfigured);
+      if (status.isAuthenticated && status.user) {
+        setAdminUser(status.user);
+      } else {
+        setAdminUser(null);
+        if (currentAdminRoute !== '/admin/login') {
+          onNavigateAdmin('/admin/login');
+        }
+      }
+    });
     loadAllData();
-  }, []);
+  }, [currentAdminRoute]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -116,29 +136,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Auth Handlers
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
     setAuthError('');
 
-    setTimeout(() => {
-      const res = ToolStorageService.loginAdmin(emailInput, passwordInput);
+    try {
+      const res = await ToolStorageService.loginAdmin(emailInput, passwordInput);
       setIsLoggingIn(false);
 
       if (res.success) {
         setAdminUser(ToolStorageService.getAdminUser());
+        setPasswordInput('');
         showToast('Welcome back, Admin!');
         onNavigateAdmin('/admin/dashboard');
         loadAllData();
       } else {
         setAuthError(res.message || 'Invalid email or password.');
       }
-    }, 400);
+    } catch {
+      setIsLoggingIn(false);
+      setAuthError('Invalid email or password.');
+    }
   };
 
-  const handleLogout = () => {
-    ToolStorageService.logoutAdmin();
+  const handleSetupFirstAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSettingUp(true);
+    setSetupError('');
+
+    if (setupPassword.length < 8) {
+      setIsSettingUp(false);
+      setSetupError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    if (setupPassword !== setupConfirmPassword) {
+      setIsSettingUp(false);
+      setSetupError('Passwords do not match.');
+      return;
+    }
+
+    try {
+      const res = await ToolStorageService.setupFirstAdmin(setupEmail, setupPassword, setupConfirmPassword);
+      setIsSettingUp(false);
+
+      if (res.success) {
+        setIsConfigured(true);
+        setAdminUser(ToolStorageService.getAdminUser());
+        setSetupPassword('');
+        setSetupConfirmPassword('');
+        showToast('Administrator account created successfully.');
+        onNavigateAdmin('/admin/dashboard');
+        loadAllData();
+      } else {
+        setSetupError(res.message || 'Failed to create administrator account.');
+      }
+    } catch {
+      setIsSettingUp(false);
+      setSetupError('An error occurred during administrator setup.');
+    }
+  };
+
+  const handleLogout = async () => {
+    await ToolStorageService.logoutAdmin();
     setAdminUser(null);
+    setEmailInput('');
+    setPasswordInput('');
     showToast('Signed out successfully.');
     onNavigateAdmin('/admin/login');
   };
@@ -287,7 +351,125 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // 1. LOGIN PAGE VIEW
+  // 1. INITIAL SETUP VIEW (Shown ONLY if no administrator account exists)
+  if (!isConfigured) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3">
+          <div 
+            onClick={() => onPublicNavigate('/')}
+            className="inline-flex items-center gap-2.5 cursor-pointer group"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#6C5CE7] to-[#4285F4] text-white shadow-md shadow-[#6C5CE7]/20 group-hover:scale-105 transition-transform">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-[#172033]">
+              NextGen AI Guide
+            </span>
+          </div>
+
+          <h2 className="text-2xl font-extrabold text-[#172033] tracking-tight">
+            Initial Administrator Setup
+          </h2>
+          <p className="text-xs sm:text-sm text-[#64748B]">
+            Set up the administrator credentials to securely initialize your platform.
+          </p>
+        </div>
+
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
+          <div className="bg-white py-8 px-6 sm:px-10 rounded-3xl border border-[#E8ECF4] shadow-xl shadow-[#172033]/5 space-y-6">
+            <form onSubmit={handleSetupFirstAdmin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
+                  Administrator Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={setupEmail}
+                  onChange={(e) => setSetupEmail(e.target.value)}
+                  placeholder="Enter administrator email"
+                  className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
+                  Password (min 8 characters)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={8}
+                    value={setupPassword}
+                    onChange={(e) => setSetupPassword(e.target.value)}
+                    placeholder="Create a strong password"
+                    className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#64748B] hover:text-[#172033] cursor-pointer"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-[#172033] tracking-wider mb-1">
+                  Confirm Password
+                </label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={8}
+                  value={setupConfirmPassword}
+                  onChange={(e) => setSetupConfirmPassword(e.target.value)}
+                  placeholder="Re-enter password"
+                  className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium"
+                />
+              </div>
+
+              {setupError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                  {setupError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSettingUp}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#4285F4] hover:opacity-95 text-white text-sm font-bold shadow-md shadow-[#6C5CE7]/20 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {isSettingUp ? (
+                  <span>Initializing Administrator...</span>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Establish Administrator Account</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="text-center pt-2">
+              <button
+                onClick={() => onPublicNavigate('/')}
+                className="text-xs font-semibold text-[#6C5CE7] hover:underline cursor-pointer"
+              >
+                ← Return to Public Homepage
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. SECURE LOGIN PAGE VIEW
   if (!isAuthenticated || currentAdminRoute === '/admin/login') {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -324,7 +506,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   required
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="admin@nextgenai.guide"
+                  placeholder="Enter administrator email"
                   className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium"
                 />
               </div>
@@ -339,7 +521,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     required
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="Enter admin password..."
+                    placeholder="Enter password"
                     className="w-full rounded-xl bg-[#F8FAFC] border-2 border-[#E8ECF4] px-4 py-3 text-sm text-[#172033] placeholder-[#64748B] focus:border-[#6C5CE7] focus:outline-none transition-colors font-medium pr-10"
                   />
                   <button
@@ -374,20 +556,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
               </button>
             </form>
-
-            {/* First Administrator Credentials Note */}
-            <div className="pt-4 border-t border-[#E8ECF4] space-y-2 text-xs text-[#64748B]">
-              <div className="flex items-center gap-1.5 font-bold text-[#172033]">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Pre-Configured Administrator Passkey</span>
-              </div>
-              <p className="leading-relaxed">
-                Default credentials: <code className="font-mono text-[#6C5CE7] bg-[#6C5CE7]/8 px-1.5 py-0.5 rounded font-bold">admin@nextgenai.guide</code> with password <code className="font-mono text-[#6C5CE7] bg-[#6C5CE7]/8 px-1.5 py-0.5 rounded font-bold">admin2026</code>.
-              </p>
-              <p className="text-[11px] text-[#64748B]">
-                Public self-registration is permanently disabled for security.
-              </p>
-            </div>
 
             <div className="text-center pt-2">
               <button

@@ -44,8 +44,9 @@ export default function App() {
     setSettings(ToolStorageService.getSettings());
   };
 
-  // Synchronize with database changes
+  // Synchronize with database changes and backend server
   useEffect(() => {
+    ToolStorageService.syncWithServer();
     const unsubscribe = subscribeToToolStorage(refreshAllData);
     return () => unsubscribe();
   }, []);

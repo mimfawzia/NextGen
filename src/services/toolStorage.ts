@@ -23,7 +23,8 @@ const CATEGORIES_STORAGE_KEY = 'nextgen_ai_categories_v3';
 const TUTORIALS_STORAGE_KEY = 'nextgen_ai_tutorials_v3';
 const GUIDES_STORAGE_KEY = 'nextgen_ai_income_guides_v3';
 const ARTICLES_STORAGE_KEY = 'nextgen_ai_articles_v3';
-const ADMIN_AUTH_KEY = 'nextgen_admin_auth_user_v3';
+const ADMIN_SESSION_TOKEN_KEY = 'nextgen_admin_session_token';
+const ADMIN_USER_KEY = 'nextgen_admin_profile';
 
 type ChangeListener = () => void;
 const listeners: Set<ChangeListener> = new Set();
@@ -42,6 +43,43 @@ export function subscribeToToolStorage(listener: ChangeListener): () => void {
 }
 
 export class ToolStorageService {
+  // Sync data with server on application launch
+  static async syncWithServer(): Promise<void> {
+    try {
+      const [toolsRes, catRes, tutRes, guideRes, artRes, settingsRes] = await Promise.allSettled([
+        fetch('/api/public/tools').then(r => r.ok ? r.json() : null),
+        fetch('/api/public/categories').then(r => r.ok ? r.json() : null),
+        fetch('/api/public/tutorials').then(r => r.ok ? r.json() : null),
+        fetch('/api/public/income-guides').then(r => r.ok ? r.json() : null),
+        fetch('/api/public/articles').then(r => r.ok ? r.json() : null),
+        fetch('/api/public/settings').then(r => r.ok ? r.json() : null)
+      ]);
+
+      if (toolsRes.status === 'fulfilled' && toolsRes.value) {
+        localStorage.setItem(TOOLS_STORAGE_KEY, JSON.stringify(toolsRes.value));
+      }
+      if (catRes.status === 'fulfilled' && catRes.value) {
+        localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(catRes.value));
+      }
+      if (tutRes.status === 'fulfilled' && tutRes.value) {
+        localStorage.setItem(TUTORIALS_STORAGE_KEY, JSON.stringify(tutRes.value));
+      }
+      if (guideRes.status === 'fulfilled' && guideRes.value) {
+        localStorage.setItem(GUIDES_STORAGE_KEY, JSON.stringify(guideRes.value));
+      }
+      if (artRes.status === 'fulfilled' && artRes.value) {
+        localStorage.setItem(ARTICLES_STORAGE_KEY, JSON.stringify(artRes.value));
+      }
+      if (settingsRes.status === 'fulfilled' && settingsRes.value) {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settingsRes.value));
+      }
+
+      notifyListeners();
+    } catch {
+      // Offline fallback: use local initial state
+    }
+  }
+
   // ================= TOOLS =================
 
   static getTools(includeUnpublished = false): ToolItem[] {
@@ -115,6 +153,20 @@ export class ToolStorageService {
 
     localStorage.setItem(TOOLS_STORAGE_KEY, JSON.stringify(all));
     notifyListeners();
+
+    // Persist to backend server if admin session token exists
+    const token = this.getAuthToken();
+    if (token) {
+      fetch('/api/admin/tools', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(savedTool)
+      }).catch(err => console.error('Error saving tool to server:', err));
+    }
+
     return savedTool;
   }
 
@@ -124,6 +176,16 @@ export class ToolStorageService {
     if (filtered.length !== all.length) {
       localStorage.setItem(TOOLS_STORAGE_KEY, JSON.stringify(filtered));
       notifyListeners();
+
+      const token = this.getAuthToken();
+      if (token) {
+        fetch(`/api/admin/tools/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }).catch(err => console.error('Error deleting tool from server:', err));
+      }
       return true;
     }
     return false;
@@ -137,6 +199,19 @@ export class ToolStorageService {
     tool.updatedAt = new Date().toISOString();
     localStorage.setItem(TOOLS_STORAGE_KEY, JSON.stringify(all));
     notifyListeners();
+
+    const token = this.getAuthToken();
+    if (token) {
+      fetch('/api/admin/tools', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(tool)
+      }).catch(err => console.error('Error updating tool to server:', err));
+    }
+
     return tool.isFeatured;
   }
 
@@ -148,6 +223,19 @@ export class ToolStorageService {
     tool.updatedAt = new Date().toISOString();
     localStorage.setItem(TOOLS_STORAGE_KEY, JSON.stringify(all));
     notifyListeners();
+
+    const token = this.getAuthToken();
+    if (token) {
+      fetch('/api/admin/tools', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(tool)
+      }).catch(err => console.error('Error updating tool to server:', err));
+    }
+
     return tool.isPublished;
   }
 
@@ -160,72 +248,65 @@ export class ToolStorageService {
       shortDescription: `A powerful AI assistant for writing, research, and productivity.`,
       websiteUrl: 'https://example.com',
       pricingStatus: 'Free Plan Available',
-      pricingDetails: 'Free plan with standard features. Optional subscription available.',
+      pricingDetails: 'Free tier available with core capabilities. Optional paid plan unlocks advanced features.',
       iconType: 'custom',
-      category: 'Conversational & Writing',
-      tags: ['AI', 'Assistant', 'Beginner Friendly'],
+      category: 'General',
+      tags: ['AI', 'Productivity'],
       isFeatured: false,
       isPublished: true,
       order: 99,
-      intro: `${name} is an artificial intelligence tool designed to streamline everyday digital tasks and help beginners build new skills.`,
-      whatIsUsedFor: 'Drafting text, answering questions, organizing notes, and learning new concepts.',
+      intro: `${name} is an artificial intelligence assistant created to improve productivity and streamline creative workflows.`,
+      whatIsUsedFor: 'Brainstorming, draft generation, researching unfamiliar topics, and everyday assistance.',
       keyFeatures: [
-        'Natural language conversation interface',
-        'Fast response generation',
-        'Easy-to-use search and prompt options'
+        'Natural conversational interface',
+        'Multi-step workflow assistance',
+        'Beginner-friendly guidance'
       ],
       freePlanLimitations: {
-        summary: 'Free tier available with reasonable fair-use limits.',
+        summary: 'Free tier includes standard features with usage limits during peak periods.',
         details: [
-          'Basic features included without payment',
-          'Higher capacity or advanced modes require a subscription'
+          'Standard response speeds',
+          'Daily generation limits',
+          'Basic customer support'
         ]
       },
       beginnerGuide: [
         {
           stepNumber: 1,
-          title: 'Visit Official Website',
-          description: 'Open the tool in your web browser and sign up if prompted.'
+          title: 'Sign Up',
+          description: 'Visit the official website and register for a free account.'
         },
         {
           stepNumber: 2,
-          title: 'Type a Clear Prompt',
-          description: 'Describe what you want to achieve with specific context and desired tone.'
-        },
-        {
-          stepNumber: 3,
-          title: 'Review and Refine',
-          description: 'Iterate on the response with follow-up instructions to fit your exact needs.'
+          title: 'Enter Your Prompt',
+          description: 'Be specific about what you need and provide context for best results.'
         }
       ],
       examplePrompts: [
         {
-          title: 'Summarize Text',
-          category: 'Everyday Work',
-          prompt: 'Please summarize the following text into 3 key takeaways: [Insert text]'
-        },
-        {
-          title: 'Draft a Friendly Email',
-          category: 'Communication',
-          prompt: 'Draft a warm, polite email thanking a colleague for their help on our project.'
+          title: 'Draft an Introduction',
+          category: 'Writing',
+          prompt: 'Write an engaging introductory paragraph about the benefits of AI in digital education.'
         }
       ],
       advantages: [
-        'Simple and beginner friendly',
-        'Works right inside modern browsers'
+        'Easy to learn for beginners',
+        'High versatility across multiple tasks',
+        'Generous free starter plan'
       ],
       limitations: [
-        'Always verify critical facts before relying on generated output'
+        'Occasional inaccuracies on niche topics',
+        'Requires clear, structured prompting'
       ],
       incomeAndFreelancing: {
-        title: 'Freelance & Online Income Ideas',
-        description: `Leverage ${name} to boost speed and quality across independent client work.`,
+        title: 'Freelance Research & Writing Support',
+        description: 'Use this tool to outline client articles, draft summaries, and proofread content faster.',
         tactics: [
-          'Speeding up client research and draft preparation',
-          'Polishing customer communications and proposals'
+          'Generate comprehensive research outlines for blog clients',
+          'Proofread and polish client documents 3x faster'
         ]
       },
-      relatedToolSlugs: ['chatgpt', 'gemini'],
+      relatedToolSlugs: ['chatgpt', 'gemini', 'claude'],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -256,6 +337,19 @@ export class ToolStorageService {
     }
     localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(all));
     notifyListeners();
+
+    const token = this.getAuthToken();
+    if (token) {
+      fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(category)
+      }).catch(err => console.error('Error saving category to server:', err));
+    }
+
     return category;
   }
 
@@ -265,6 +359,17 @@ export class ToolStorageService {
     if (filtered.length !== all.length) {
       localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(filtered));
       notifyListeners();
+
+      const token = this.getAuthToken();
+      if (token) {
+        fetch(`/api/admin/categories/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }).catch(err => console.error('Error deleting category from server:', err));
+      }
+
       return true;
     }
     return false;
@@ -286,59 +391,38 @@ export class ToolStorageService {
     }
   }
 
-  static getTutorialBySlug(slug: string): TutorialItem | undefined {
-    const all = this.getTutorials(true);
-    return all.find(t => t.slug.toLowerCase() === slug.toLowerCase());
-  }
-
-  static saveTutorial(tutorial: Partial<TutorialItem> & { title: string }): TutorialItem {
+  static saveTutorial(tut: TutorialItem): TutorialItem {
     const all = this.getTutorials(true);
     const now = new Date().toISOString();
     let saved: TutorialItem;
-
-    if (tutorial.id) {
-      const idx = all.findIndex(t => t.id === tutorial.id);
-      if (idx >= 0) {
-        saved = { ...all[idx], ...tutorial, updatedAt: now };
-        all[idx] = saved;
-      } else {
-        saved = {
-          id: tutorial.id,
-          slug: tutorial.slug || tutorial.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          title: tutorial.title,
-          summary: tutorial.summary || '',
-          toolSlug: tutorial.toolSlug || 'chatgpt',
-          toolName: tutorial.toolName || 'ChatGPT',
-          category: tutorial.category || 'General',
-          readTime: tutorial.readTime || '5 min read',
-          steps: tutorial.steps || [],
-          isPublished: tutorial.isPublished ?? true,
-          createdAt: now,
-          updatedAt: now
-        };
-        all.push(saved);
-      }
+    const idx = all.findIndex(t => t.id === tut.id);
+    if (idx >= 0) {
+      saved = { ...tut, updatedAt: now };
+      all[idx] = saved;
     } else {
-      const slug = tutorial.slug || tutorial.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       saved = {
-        id: `tut-${Date.now()}`,
-        slug,
-        title: tutorial.title,
-        summary: tutorial.summary || '',
-        toolSlug: tutorial.toolSlug || 'chatgpt',
-        toolName: tutorial.toolName || 'ChatGPT',
-        category: tutorial.category || 'General',
-        readTime: tutorial.readTime || '5 min read',
-        steps: tutorial.steps || [],
-        isPublished: tutorial.isPublished ?? true,
+        ...tut,
+        id: tut.id || `tut-${Date.now()}`,
         createdAt: now,
         updatedAt: now
       };
       all.push(saved);
     }
-
     localStorage.setItem(TUTORIALS_STORAGE_KEY, JSON.stringify(all));
     notifyListeners();
+
+    const token = this.getAuthToken();
+    if (token) {
+      fetch('/api/admin/tutorials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(saved)
+      }).catch(err => console.error('Error saving tutorial to server:', err));
+    }
+
     return saved;
   }
 
@@ -348,20 +432,20 @@ export class ToolStorageService {
     if (filtered.length !== all.length) {
       localStorage.setItem(TUTORIALS_STORAGE_KEY, JSON.stringify(filtered));
       notifyListeners();
+
+      const token = this.getAuthToken();
+      if (token) {
+        fetch(`/api/admin/tutorials/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }).catch(err => console.error('Error deleting tutorial from server:', err));
+      }
+
       return true;
     }
     return false;
-  }
-
-  static toggleTutorialPublished(id: string): boolean {
-    const all = this.getTutorials(true);
-    const item = all.find(t => t.id === id);
-    if (!item) return false;
-    item.isPublished = !item.isPublished;
-    item.updatedAt = new Date().toISOString();
-    localStorage.setItem(TUTORIALS_STORAGE_KEY, JSON.stringify(all));
-    notifyListeners();
-    return item.isPublished;
   }
 
   // ================= INCOME GUIDES =================
@@ -380,56 +464,38 @@ export class ToolStorageService {
     }
   }
 
-  static saveIncomeGuide(guide: Partial<IncomeGuideItem> & { title: string }): IncomeGuideItem {
+  static saveIncomeGuide(guide: IncomeGuideItem): IncomeGuideItem {
     const all = this.getIncomeGuides(true);
     const now = new Date().toISOString();
     let saved: IncomeGuideItem;
-
-    if (guide.id) {
-      const idx = all.findIndex(g => g.id === guide.id);
-      if (idx >= 0) {
-        saved = { ...all[idx], ...guide, updatedAt: now };
-        all[idx] = saved;
-      } else {
-        saved = {
-          id: guide.id,
-          slug: guide.slug || guide.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          title: guide.title,
-          category: guide.category || 'Freelancing',
-          difficulty: guide.difficulty || 'Beginner',
-          estimatedEarnings: guide.estimatedEarnings || '$25 – $50 / hr',
-          summary: guide.summary || '',
-          recommendedTools: guide.recommendedTools || ['ChatGPT'],
-          executionSteps: guide.executionSteps || [],
-          deliverableExample: guide.deliverableExample || '',
-          isPublished: guide.isPublished ?? true,
-          createdAt: now,
-          updatedAt: now
-        };
-        all.push(saved);
-      }
+    const idx = all.findIndex(g => g.id === guide.id);
+    if (idx >= 0) {
+      saved = { ...guide, updatedAt: now };
+      all[idx] = saved;
     } else {
-      const slug = guide.slug || guide.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       saved = {
-        id: `guide-${Date.now()}`,
-        slug,
-        title: guide.title,
-        category: guide.category || 'Freelancing',
-        difficulty: guide.difficulty || 'Beginner',
-        estimatedEarnings: guide.estimatedEarnings || '$25 – $50 / hr',
-        summary: guide.summary || '',
-        recommendedTools: guide.recommendedTools || ['ChatGPT'],
-        executionSteps: guide.executionSteps || [],
-        deliverableExample: guide.deliverableExample || '',
-        isPublished: guide.isPublished ?? true,
+        ...guide,
+        id: guide.id || `guide-${Date.now()}`,
         createdAt: now,
         updatedAt: now
       };
       all.push(saved);
     }
-
     localStorage.setItem(GUIDES_STORAGE_KEY, JSON.stringify(all));
     notifyListeners();
+
+    const token = this.getAuthToken();
+    if (token) {
+      fetch('/api/admin/income-guides', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(saved)
+      }).catch(err => console.error('Error saving income guide to server:', err));
+    }
+
     return saved;
   }
 
@@ -439,20 +505,20 @@ export class ToolStorageService {
     if (filtered.length !== all.length) {
       localStorage.setItem(GUIDES_STORAGE_KEY, JSON.stringify(filtered));
       notifyListeners();
+
+      const token = this.getAuthToken();
+      if (token) {
+        fetch(`/api/admin/income-guides/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }).catch(err => console.error('Error deleting income guide from server:', err));
+      }
+
       return true;
     }
     return false;
-  }
-
-  static toggleIncomeGuidePublished(id: string): boolean {
-    const all = this.getIncomeGuides(true);
-    const item = all.find(g => g.id === id);
-    if (!item) return false;
-    item.isPublished = !item.isPublished;
-    item.updatedAt = new Date().toISOString();
-    localStorage.setItem(GUIDES_STORAGE_KEY, JSON.stringify(all));
-    notifyListeners();
-    return item.isPublished;
   }
 
   // ================= ARTICLES =================
@@ -479,7 +545,7 @@ export class ToolStorageService {
     if (article.id) {
       const idx = all.findIndex(a => a.id === article.id);
       if (idx >= 0) {
-        saved = { ...all[idx], ...article, updatedAt: now };
+        saved = { ...all[idx], ...article, updatedAt: now } as ArticleItem;
         all[idx] = saved;
       } else {
         saved = {
@@ -517,6 +583,19 @@ export class ToolStorageService {
 
     localStorage.setItem(ARTICLES_STORAGE_KEY, JSON.stringify(all));
     notifyListeners();
+
+    const token = this.getAuthToken();
+    if (token) {
+      fetch('/api/admin/articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(saved)
+      }).catch(err => console.error('Error saving article to server:', err));
+    }
+
     return saved;
   }
 
@@ -526,20 +605,20 @@ export class ToolStorageService {
     if (filtered.length !== all.length) {
       localStorage.setItem(ARTICLES_STORAGE_KEY, JSON.stringify(filtered));
       notifyListeners();
+
+      const token = this.getAuthToken();
+      if (token) {
+        fetch(`/api/admin/articles/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }).catch(err => console.error('Error deleting article from server:', err));
+      }
+
       return true;
     }
     return false;
-  }
-
-  static toggleArticlePublished(id: string): boolean {
-    const all = this.getArticles(true);
-    const item = all.find(a => a.id === id);
-    if (!item) return false;
-    item.isPublished = !item.isPublished;
-    item.updatedAt = new Date().toISOString();
-    localStorage.setItem(ARTICLES_STORAGE_KEY, JSON.stringify(all));
-    notifyListeners();
-    return item.isPublished;
   }
 
   // ================= SETTINGS =================
@@ -562,6 +641,19 @@ export class ToolStorageService {
     const updated = { ...current, ...newSettings };
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
     notifyListeners();
+
+    const token = this.getAuthToken();
+    if (token) {
+      fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updated)
+      }).catch(err => console.error('Error saving settings to server:', err));
+    }
+
     return updated;
   }
 
@@ -575,11 +667,15 @@ export class ToolStorageService {
     notifyListeners();
   }
 
-  // ================= ADMIN AUTHENTICATION =================
+  // ================= SECURE BACKEND AUTHENTICATION =================
+
+  static getAuthToken(): string | null {
+    return sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY) || localStorage.getItem(ADMIN_SESSION_TOKEN_KEY);
+  }
 
   static getAdminUser(): AdminUser | null {
     try {
-      const raw = localStorage.getItem(ADMIN_AUTH_KEY);
+      const raw = sessionStorage.getItem(ADMIN_USER_KEY) || localStorage.getItem(ADMIN_USER_KEY);
       if (!raw) return null;
       return JSON.parse(raw);
     } catch {
@@ -588,46 +684,157 @@ export class ToolStorageService {
   }
 
   static isAdminLoggedIn(): boolean {
-    const user = this.getAdminUser();
-    return user !== null && !!user.token;
+    const token = this.getAuthToken();
+    return !!token;
   }
 
-  static loginAdmin(email: string, pass: string): { success: boolean; message?: string } {
-    const cleanEmail = email.toLowerCase().trim();
-    const cleanPass = pass.trim();
+  // Check backend server auth status
+  static async checkAuthStatus(): Promise<{
+    isConfigured: boolean;
+    isAuthenticated: boolean;
+    user: AdminUser | null;
+  }> {
+    try {
+      const token = this.getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-    // Default administrator accounts
-    const validCredentials = [
-      { email: 'admin@nextgenai.guide', pass: 'admin2026' },
-      { email: 'admin@nextgen.com', pass: 'admin2026' },
-      { email: 'admin', pass: 'admin2026' },
-      { email: 'mimfawzia6@gmail.com', pass: 'admin2026' }
-    ];
+      const res = await fetch('/api/auth/status', { headers });
+      if (!res.ok) {
+        return { isConfigured: true, isAuthenticated: false, user: null };
+      }
 
-    const match = validCredentials.find(c => 
-      (c.email === cleanEmail || cleanEmail === 'admin') && c.pass === cleanPass
-    );
+      const data = await res.json();
+      if (!data.isAuthenticated) {
+        // Clear expired or invalidated session
+        sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+        sessionStorage.removeItem(ADMIN_USER_KEY);
+        localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+        localStorage.removeItem(ADMIN_USER_KEY);
+      }
 
-    if (match || (cleanEmail && cleanPass === 'admin2026')) {
+      return {
+        isConfigured: data.isConfigured !== false,
+        isAuthenticated: !!data.isAuthenticated,
+        user: data.user ? {
+          email: data.user.email,
+          role: data.user.role || 'Super Administrator',
+          token: token || '',
+          loginTime: new Date().toISOString()
+        } : null
+      };
+    } catch {
+      // Offline fallback
+      return {
+        isConfigured: true,
+        isAuthenticated: this.isAdminLoggedIn(),
+        user: this.getAdminUser()
+      };
+    }
+  }
+
+  // Setup First Administrator (One-time, only if no admin exists)
+  static async setupFirstAdmin(email: string, pass: string, confirmPass: string): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    try {
+      const res = await fetch('/api/auth/setup-first-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: pass,
+          confirmPassword: confirmPass
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, message: data.error || 'Failed to initialize administrator account.' };
+      }
+
       const user: AdminUser = {
-        email: cleanEmail.includes('@') ? cleanEmail : 'admin@nextgenai.guide',
+        email: data.user.email,
         role: 'Super Administrator',
-        token: `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        token: data.token,
         loginTime: new Date().toISOString()
       };
-      localStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify(user));
+
+      sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+      sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+      localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+      localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+
       notifyListeners();
       return { success: true };
+    } catch {
+      return { success: false, message: 'Server communication error. Please try again.' };
     }
-
-    return { 
-      success: false, 
-      message: 'Invalid credentials. Please enter a valid administrator email and password.' 
-    };
   }
 
-  static logoutAdmin(): void {
-    localStorage.removeItem(ADMIN_AUTH_KEY);
+  // Login Administrator with real server verification
+  static async loginAdmin(email: string, pass: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: pass
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { 
+          success: false, 
+          message: data.error || 'Invalid email or password.' 
+        };
+      }
+
+      const user: AdminUser = {
+        email: data.user.email,
+        role: 'Super Administrator',
+        token: data.token,
+        loginTime: new Date().toISOString()
+      };
+
+      sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+      sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+      localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+      localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+
+      notifyListeners();
+      return { success: true };
+    } catch {
+      return { 
+        success: false, 
+        message: 'Invalid email or password.' 
+      };
+    }
+  }
+
+  // Logout Administrator
+  static async logoutAdmin(): Promise<void> {
+    const token = this.getAuthToken();
+    if (token) {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch {
+        // Ignore network errors on logout
+      }
+    }
+
+    sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+    sessionStorage.removeItem(ADMIN_USER_KEY);
+    localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_USER_KEY);
     notifyListeners();
   }
 }
