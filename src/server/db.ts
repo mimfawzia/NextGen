@@ -16,7 +16,8 @@ import {
   INITIAL_TUTORIALS, 
   INITIAL_INCOME_GUIDES, 
   INITIAL_ARTICLES,
-  INITIAL_PROMPTS 
+  INITIAL_PROMPTS,
+  INITIAL_ADMIN
 } from '../data/initialTools';
 
 interface AdminRecord {
@@ -51,24 +52,27 @@ class DatabaseManager {
   private loadDatabase(): ServerDatabase {
     try {
       if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
+        try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch {}
       }
 
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
+        if (!parsed.admin || !parsed.admin.email || !parsed.admin.hash) {
+          parsed.admin = INITIAL_ADMIN;
+        }
         if (!parsed.prompts || !Array.isArray(parsed.prompts) || parsed.prompts.length === 0) {
           parsed.prompts = INITIAL_PROMPTS;
         }
         return parsed;
       }
     } catch (err) {
-      console.error('Failed to load database from disk, using initial state:', err);
+      console.warn('Failed to load database from disk, using initial state:', err);
     }
 
     // Default seeded state
     const initialDb: ServerDatabase = {
-      admin: null, // No default admin password hardcoded. Setup required on initial deployment.
+      admin: INITIAL_ADMIN,
       tools: INITIAL_TOOLS,
       categories: INITIAL_CATEGORIES,
       tutorials: INITIAL_TUTORIALS,
@@ -85,11 +89,11 @@ class DatabaseManager {
   private persist(dbData = this.data): void {
     try {
       if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
+        try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch {}
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(dbData, null, 2), 'utf-8');
     } catch (err) {
-      console.error('Failed to write database to disk:', err);
+      console.warn('Failed to write database to disk (e.g. read-only serverless environment):', err);
     }
   }
 

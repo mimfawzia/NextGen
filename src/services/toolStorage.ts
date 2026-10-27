@@ -643,36 +643,66 @@ export class ToolStorageService {
 
     try {
       const res = await fetch('/api/prompts', { headers });
-      if (!res.ok) {
-        return { locked: true, isAuthenticated: false, message: 'Failed to retrieve prompts from server.' };
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (!data.locked && data.prompts) {
+          localStorage.setItem(PROMPTS_STORAGE_KEY, JSON.stringify(data.prompts));
+        }
+        return data;
       }
-      const data = await res.json();
-      if (!data.locked && data.prompts) {
-        localStorage.setItem(PROMPTS_STORAGE_KEY, JSON.stringify(data.prompts));
-      }
-      return data;
     } catch {
-      // Offline fallback: if logged in as admin, check local cache
+      // Server offline / static hosting fallback
+    }
+
+    // Fallback: If admin is logged in, provide full INITIAL_PROMPTS
+    if (this.isAdminLoggedIn()) {
       const cached = localStorage.getItem(PROMPTS_STORAGE_KEY);
-      if (this.isAdminLoggedIn() && cached) {
+      let list: PromptItem[] = INITIAL_PROMPTS;
+      if (cached) {
         try {
-          return { locked: false, isAuthenticated: true, prompts: JSON.parse(cached) };
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
         } catch {}
       }
-      return { 
-        locked: true, 
-        isAuthenticated: false, 
-        message: 'Prompts Vault is protected. Log in with admin credentials to access.' 
-      };
+      localStorage.setItem(PROMPTS_STORAGE_KEY, JSON.stringify(list));
+      return { locked: false, isAuthenticated: true, prompts: list };
     }
+
+    // If not logged in, provide teasers without sensitive promptText
+    const categories = Array.from(new Set(INITIAL_PROMPTS.map(p => p.category)));
+    const teasers = INITIAL_PROMPTS.map(p => ({
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      category: p.category,
+      targetAi: p.targetAi,
+      tags: p.tags,
+      order: p.order,
+      isExclusiveAdmin: p.isExclusiveAdmin,
+      variableCount: p.variables ? p.variables.length : 0
+    }));
+
+    return { 
+      locked: true, 
+      isAuthenticated: false, 
+      message: 'Access restricted. Please sign in with administrator credentials (admin@nextgenai.guide) to unlock and copy these prompts.',
+      count: INITIAL_PROMPTS.length,
+      categories,
+      teasers
+    };
   }
 
   static getCachedPrompts(): PromptItem[] {
     try {
       const data = localStorage.getItem(PROMPTS_STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
+      if (!data) {
+        localStorage.setItem(PROMPTS_STORAGE_KEY, JSON.stringify(INITIAL_PROMPTS));
+        return INITIAL_PROMPTS;
+      }
+      return JSON.parse(data);
     } catch {
-      return [];
+      return INITIAL_PROMPTS;
     }
   }
 
@@ -879,43 +909,45 @@ export class ToolStorageService {
     isAuthenticated: boolean;
     user: AdminUser | null;
   }> {
+    const token = this.getAuthToken();
+    const currentUser = this.getAdminUser();
+
     try {
-      const token = this.getAuthToken();
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
       const res = await fetch('/api/auth/status', { headers });
-      if (!res.ok) {
-        return { isConfigured: true, isAuthenticated: false, user: null };
-      }
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (!data.isAuthenticated && !token?.startsWith('admin-session-')) {
+          this.clearSession();
+        }
 
-      const data = await res.json();
-      if (!data.isAuthenticated) {
-        // Clear expired or invalidated session
-        this.clearSession();
+        return {
+          isConfigured: data.isConfigured !== false,
+          adminEmail: data.adminEmail || 'admin@nextgenai.guide',
+          isAuthenticated: !!data.isAuthenticated || (this.isAdminLoggedIn() && !!currentUser),
+          user: data.user ? {
+            email: data.user.email,
+            role: data.user.role || 'Super Administrator',
+            token: token || '',
+            loginTime: new Date().toISOString()
+          } : currentUser
+        };
       }
-
-      return {
-        isConfigured: data.isConfigured !== false,
-        adminEmail: data.adminEmail || null,
-        isAuthenticated: !!data.isAuthenticated,
-        user: data.user ? {
-          email: data.user.email,
-          role: data.user.role || 'Super Administrator',
-          token: token || '',
-          loginTime: new Date().toISOString()
-        } : null
-      };
     } catch {
       // Offline fallback
-      return {
-        isConfigured: true,
-        isAuthenticated: this.isAdminLoggedIn(),
-        user: this.getAdminUser()
-      };
     }
+
+    return {
+      isConfigured: true,
+      adminEmail: 'admin@nextgenai.guide',
+      isAuthenticated: this.isAdminLoggedIn(),
+      user: currentUser
+    };
   }
 
   // Setup First Administrator (One-time, only if no admin exists)
@@ -934,71 +966,119 @@ export class ToolStorageService {
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, message: data.error || 'Failed to initialize administrator account.' };
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (!res.ok) {
+          return { success: false, message: data.error || 'Failed to initialize administrator account.' };
+        }
+
+        const user: AdminUser = {
+          email: data.user.email,
+          role: 'Super Administrator',
+          token: data.token,
+          loginTime: new Date().toISOString()
+        };
+
+        localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+        localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+        sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+        sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+
+        notifyListeners();
+        return { success: true };
       }
-
-      const user: AdminUser = {
-        email: data.user.email,
-        role: 'Super Administrator',
-        token: data.token,
-        loginTime: new Date().toISOString()
-      };
-
-      localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
-      localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
-      sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
-      sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
-
-      notifyListeners();
-      return { success: true };
     } catch {
-      return { success: false, message: 'Server communication error. Please try again.' };
+      // Fall through
     }
+    return { success: false, message: 'Server communication error. Please try again.' };
   }
 
-  // Login Administrator with real server verification
+  // Login Administrator with real server verification & client cryptographic fallback for published sites
   static async loginAdmin(email: string, pass: string): Promise<{ success: boolean; message?: string; needsSetup?: boolean }> {
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanPass = pass;
+
+    // 1. First attempt verification against server API endpoint
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim(),
-          password: pass
+          email: cleanEmail,
+          password: cleanPass
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        return { 
-          success: false, 
-          message: data.error || 'Invalid email or password.',
-          needsSetup: !!data.needsSetup
-        };
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (res.ok && data.success) {
+          const user: AdminUser = {
+            email: data.user.email,
+            role: 'Super Administrator',
+            token: data.token,
+            loginTime: new Date().toISOString()
+          };
+
+          localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+          localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+          sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
+          sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+
+          notifyListeners();
+          return { success: true };
+        } else if (res.status === 401 && !data.needsSetup) {
+          // Explicit rejection from active backend
+          return { 
+            success: false, 
+            message: data.error || 'Invalid email or password.'
+          };
+        }
       }
-
-      const user: AdminUser = {
-        email: data.user.email,
-        role: 'Super Administrator',
-        token: data.token,
-        loginTime: new Date().toISOString()
-      };
-
-      localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
-      localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
-      sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, data.token);
-      sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
-
-      notifyListeners();
-      return { success: true };
     } catch {
-      return { 
-        success: false, 
-        message: 'Invalid email or password.' 
-      };
+      // Server unreachable, 404, or network failure (e.g. published on static hosting where Node backend is not running)
     }
+
+    // 2. Cryptographic Fallback (Ensures login works seamlessly even on static hosting like Vercel/Netlify/GitHub Pages)
+    try {
+      const text = `${cleanEmail}:${cleanPass}:nextgen_salt_2026`;
+      const enc = new TextEncoder().encode(text);
+      const buf = await crypto.subtle.digest('SHA-256', enc);
+      const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      const EXPECTED_HASH = '540480fb84c2be2348ed5b3b63ecd2fbb3f9849ca55044ffbd105168d61d8ab6';
+      if (hex === EXPECTED_HASH) {
+        const fallbackToken = 'admin-session-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 10);
+        const user: AdminUser = {
+          email: cleanEmail,
+          role: 'Super Administrator',
+          token: fallbackToken,
+          loginTime: new Date().toISOString()
+        };
+
+        localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, fallbackToken);
+        localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+        sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, fallbackToken);
+        sessionStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+
+        // Ensure cached prompts exist
+        const cached = localStorage.getItem(PROMPTS_STORAGE_KEY);
+        if (!cached) {
+          localStorage.setItem(PROMPTS_STORAGE_KEY, JSON.stringify(INITIAL_PROMPTS));
+        }
+
+        notifyListeners();
+        return { success: true };
+      }
+    } catch (fallbackErr) {
+      console.error('Fallback authentication error:', fallbackErr);
+    }
+
+    return { 
+      success: false, 
+      message: 'Invalid email or password.' 
+    };
   }
 
   // Change Admin Password

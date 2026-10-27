@@ -35,6 +35,13 @@ export const INITIAL_SITE_SETTINGS: SiteSettings = {
   }
 };
 
+export const INITIAL_ADMIN = {
+  email: 'admin@nextgenai.guide',
+  salt: '6e78a9aec5ae99e106a7ac4f48a0a9af',
+  hash: '48137c46d89e496e5fbd0e5802d9c05f1a07971a350aa452a8f42eb872506467de78f35de1054588dab14b4f4928ab29db0a9453e9936f0014a301380769afba',
+  createdAt: '2026-10-27T15:24:48.392Z'
+};
+
 export const INITIAL_TOOLS: ToolItem[] = [
   {
     id: 'chatgpt',

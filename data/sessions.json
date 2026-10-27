@@ -26,5 +26,12 @@
     "role": "admin",
     "createdAt": 1793116040370,
     "expiresAt": 1793202440370
+  },
+  "d5251a12a2da66100e5b20149444567b21f5d5ddd1d28602250486c34260c7f3": {
+    "token": "d5251a12a2da66100e5b20149444567b21f5d5ddd1d28602250486c34260c7f3",
+    "email": "admin@nextgenai.guide",
+    "role": "admin",
+    "createdAt": 1793117776403,
+    "expiresAt": 1793204176403
   }
 }
