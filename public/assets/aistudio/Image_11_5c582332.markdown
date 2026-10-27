@@ -1,0 +1,236 @@
+---
+name: NextGen AI Guide
+colors:
+  surface: '#0f131d'
+  surface-dim: '#0f131d'
+  surface-bright: '#353944'
+  surface-container-lowest: '#0a0e18'
+  surface-container-low: '#171b26'
+  surface-container: '#1c1f2a'
+  surface-container-high: '#262a35'
+  surface-container-highest: '#313540'
+  on-surface: '#dfe2f1'
+  on-surface-variant: '#c7c4d7'
+  inverse-surface: '#dfe2f1'
+  inverse-on-surface: '#2c303b'
+  outline: '#908fa0'
+  outline-variant: '#464554'
+  surface-tint: '#c0c1ff'
+  primary: '#c0c1ff'
+  on-primary: '#1000a9'
+  primary-container: '#8083ff'
+  on-primary-container: '#0d0096'
+  inverse-primary: '#494bd6'
+  secondary: '#d0bcff'
+  on-secondary: '#3c0091'
+  secondary-container: '#571bc1'
+  on-secondary-container: '#c4abff'
+  tertiary: '#7bd0ff'
+  on-tertiary: '#00354a'
+  tertiary-container: '#009bd1'
+  on-tertiary-container: '#002d40'
+  error: '#ffb4ab'
+  on-error: '#690005'
+  error-container: '#93000a'
+  on-error-container: '#ffdad6'
+  primary-fixed: '#e1e0ff'
+  primary-fixed-dim: '#c0c1ff'
+  on-primary-fixed: '#07006c'
+  on-primary-fixed-variant: '#2f2ebe'
+  secondary-fixed: '#e9ddff'
+  secondary-fixed-dim: '#d0bcff'
+  on-secondary-fixed: '#23005c'
+  on-secondary-fixed-variant: '#5516be'
+  tertiary-fixed: '#c4e7ff'
+  tertiary-fixed-dim: '#7bd0ff'
+  on-tertiary-fixed: '#001e2c'
+  on-tertiary-fixed-variant: '#004c69'
+  background: '#0f131d'
+  on-background: '#dfe2f1'
+  surface-variant: '#313540'
+typography:
+  display-hero:
+    fontFamily: Plus Jakarta Sans
+    fontSize: 56px
+    fontWeight: '800'
+    lineHeight: 64px
+    letterSpacing: -0.03em
+  display-hero-mobile:
+    fontFamily: Plus Jakarta Sans
+    fontSize: 36px
+    fontWeight: '800'
+    lineHeight: 44px
+    letterSpacing: -0.02em
+  headline-lg:
+    fontFamily: Plus Jakarta Sans
+    fontSize: 36px
+    fontWeight: '700'
+    lineHeight: 44px
+    letterSpacing: -0.02em
+  headline-lg-mobile:
+    fontFamily: Plus Jakarta Sans
+    fontSize: 28px
+    fontWeight: '700'
+    lineHeight: 36px
+    letterSpacing: -0.01em
+  headline-md:
+    fontFamily: Plus Jakarta Sans
+    fontSize: 24px
+    fontWeight: '600'
+    lineHeight: 32px
+    letterSpacing: -0.015em
+  headline-sm:
+    fontFamily: Plus Jakarta Sans
+    fontSize: 20px
+    fontWeight: '600'
+    lineHeight: 28px
+    letterSpacing: -0.01em
+  body-lg:
+    fontFamily: Plus Jakarta Sans
+    fontSize: 18px
+    fontWeight: '400'
+    lineHeight: 28px
+  body-md:
+    fontFamily: Plus Jakarta Sans
+    fontSize: 15px
+    fontWeight: '400'
+    lineHeight: 24px
+  body-sm:
+    fontFamily: Plus Jakarta Sans
+    fontSize: 13px
+    fontWeight: '400'
+    lineHeight: 20px
+  label-md:
+    fontFamily: JetBrains Mono
+    fontSize: 12px
+    fontWeight: '500'
+    lineHeight: 16px
+    letterSpacing: 0.02em
+  label-sm:
+    fontFamily: JetBrains Mono
+    fontSize: 11px
+    fontWeight: '500'
+    lineHeight: 14px
+    letterSpacing: 0.04em
+rounded:
+  sm: 0.25rem
+  DEFAULT: 0.5rem
+  md: 0.75rem
+  lg: 1rem
+  xl: 1.5rem
+  full: 9999px
+spacing:
+  gutter: 1.5rem
+  gutter-mobile: 1rem
+  margin: 2.5rem
+  margin-mobile: 1rem
+  space-xs: 0.25rem
+  space-sm: 0.5rem
+  space-md: 1rem
+  space-lg: 1.5rem
+  space-xl: 2.5rem
+---
+
+## Brand & Style
+
+This design system embodies the posture of an authoritative, high-velocity intelligence hub. It serves software engineers, digital entrepreneurs, creators, and operators who seek leverage through applied artificial intelligence. The aesthetic rejects the playful cartoonishness of early generative AI toys, opting instead for the poise of institutional financial technology combined with modern developer infrastructure.
+
+The core visual language blends **modern technical minimalism** with precision **tonal glassmorphism**. The interface delivers an atmosphere of deep computational power, calm mastery, and surgical clarity. Key visual tenets include:
+
+- **Architectural Dark Foundations:** Deep, low-noise navy canvas grounds the experience, cutting eye strain during extended research and technical study.
+- **Luminous Precision Accents:** High-frequency indigo, electric violet, and crisp cyan accents are applied sparingly to guide attention toward high-leverage workflows and interactive states.
+- **Editorial Utility:** Data-rich layouts maintain high scannability through strict typographic cadences, structured metadata ribbons, and subtle border contrasts.
+
+## Colors
+
+The system uses a dark-first color strategy optimized for content density, search speed, and extended reading sessions.
+
+### Core Canvas & Surfaces
+- **Canvas Base (`#0B0F19`):** Deep abyssal navy serving as the foundational background.
+- **Surface Level 1 (`#111827`):** Elevated card containers, structural sidebars, and sticky navigation headers.
+- **Surface Level 2 (`#1E293B`):** Interactive card interiors, secondary input fields, and recessed containers.
+- **Surface Level 3 (`#334155`):** Modals, flyout tooltips, and elevated drop overlays.
+
+### Accents & Semantic Tones
+- **Primary Brand Ray (`#6366F1` & `#4F46E5`):** Hyper-focused indigo for primary CTAs, active filters, and primary navigation states.
+- **Secondary Violet (`#8B5CF6`):** Applied to advanced learning milestones, AI model flags, and exclusive premium tracks.
+- **Tertiary Cyan (`#38BDF8`):** Utility accent dedicated to real-time status pulses, verified badges, and search highlight indices.
+- **Free License Badge (`#10B981`):** Emerald green indicative of open-source or permanently free tools.
+- **Freemium Badge (`#F59E0B`):** Rich warm amber indicating tiered monetization or hybrid models.
+- **Paid Badge (`#F43F5E`):** Rose-crimson signaling strictly commercial tools.
+
+### Borders & Delimiters
+- **Dark Mode Outer Border:** `#1E293B` at 100% opacity for sharp card boundaries.
+- **Subtle Surface Stroke:** `rgba(255, 255, 255, 0.08)` for interior separators and sub-component borders.
+- **Light Context Equivalent:** When rendered in high-contrast daytime viewing, surfaces shift to `#FFFFFF` with `#E2E8F0` structural outlines and `#0F172A` high-contrast typography.
+
+## Typography
+
+Typography prioritizes dense, multi-tiered hierarchy with zero ambiguity.
+
+- **Primary Typeface (`Plus Jakarta Sans`):** Selected for its crisp geometric counters, confident posture, and high legibility at extreme scale variations. Headings utilize tight negative letter spacing for an authoritative, modern software editorial demeanor.
+- **Technical Utility Typeface (`JetBrains Mono`):** Applied to badges, pricing pill indicators, metadata counters, code snippets, revenue metrics, and release version tags to communicate engineering precision.
+- **Reading Comfort:** Body copy leverages deliberate line-height expansions (1.6x) to preserve parsing comfort across long-form guides and monetization workflows.
+
+## Layout & Spacing
+
+The layout is architected around a flexible 12-column responsive grid with a strict 4px/8px proportional spacing rhythm.
+
+- **Canvas Scale:** Max layout boundary caps at `1440px` for desktop consumption, centered with dynamic auto margins to preserve human gaze span during dense directory navigation.
+- **Desktop Grid (>= 1024px):** 12 columns, `1.5rem` (24px) gutters, and a minimum outer safety margin of `2.5rem` (40px). Sidebars for directory filters occupy an anchored 3-column span; tool results populate the remaining 9 columns in a 3-wide sub-grid.
+- **Tablet Grid (768px - 1023px):** 8 columns, `1.25rem` (20px) gutters, collapsing filter panels into a collapsible sliding sheet.
+- **Mobile Grid (< 768px):** 4 columns, `1rem` (16px) gutters, `1rem` margins. All multi-column cards collapse into a continuous vertical stream with sticky quick-filter ribbons.
+
+## Elevation & Depth
+
+Visual hierarchy does not rely on heavy, muddy drop shadows. Instead, it employs **tonal layering**, **luminescent perimeter strokes**, and **subtle optical blurs**.
+
+- **Level 0 (Base Canvas):** `#0B0F19` flat background.
+- **Level 1 (Card & Section Surfaces):** `#111827` surface coupled with a structural 1px border of `#1E293B`. Shadows are restrained to ambient dispersion: `0 4px 20px -2px rgba(0, 0, 0, 0.5)`.
+- **Level 2 (Hover States & Flyouts):** Surfaces lift slightly through background color progression to `#1E293B`, accompanied by an edge refraction: `box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(99, 102, 241, 0.3)`.
+- **Level 3 (Modals & Overlays):** Background uses `rgba(17, 24, 39, 0.85)` treated with `backdrop-filter: blur(12px)`. Outlines use `rgba(255, 255, 255, 0.12)` to establish crisp separation from the underlying content tree.
+
+## Shapes
+
+The design system implements a controlled, modern geometry based on level `2` roundedness (8px base).
+
+- **Standard Elements (Buttons, Inputs, Metric Cells):** `0.5rem` (8px) radius delivers clean digital ergonomics without feeling excessively soft or blunt.
+- **Containers & Tool Cards:** `rounded-lg` (`1rem` / 16px) radius to frame complex data groups elegantly.
+- **Flyout Drawers & Hero Callouts:** `rounded-xl` (`1.5rem` / 24px) radius for major architectural landmarks.
+- **Pill Exceptions:** Badges, price flags, and status dots employ full circular pills (`9999px`) to create clear semantic contrast against structural, rectilinear card containers.
+
+## Components
+
+### Buttons
+- **Primary:** Solid `#6366F1` background, white text (`Plus Jakarta Sans`, 600 weight), `0.5rem` radius. Subtle hover shift to `#4F46E5` with an interactive outer glow: `0 0 16px rgba(99, 102, 241, 0.4)`.
+- **Secondary / Outline:** Translucent surface (`rgba(30, 41, 59, 0.6)`), 1px solid `#1E293B` border, text `#F8FAFC`. On hover, border transitions to `#6366F1` and background illuminates to `#1E293B`.
+- **Ghost:** Text `#94A3B8`, background transparent. Hover yields `#111827` background and crisp `#FFFFFF` text.
+
+### Badges & Category Chips
+- **Pricing Indicators:** Fixed mono labels using `JetBrains Mono` (`11px`, 500 weight). 
+  - *Free:* `rgba(16, 185, 129, 0.1)` fill, `1px solid rgba(16, 185, 129, 0.3)` border, `#34D399` text.
+  - *Freemium:* `rgba(245, 158, 11, 0.1)` fill, `1px solid rgba(245, 158, 11, 0.3)` border, `#FBBF24` text.
+  - *Paid:* `rgba(244, 63, 94, 0.1)` fill, `1px solid rgba(244, 63, 94, 0.3)` border, `#FB7185` text.
+- **Category Filter Chips:** Interactive pills with `#1E293B` border and subtle text. Selected state locks to primary indigo background with pure white typography.
+
+### Tool & Resource Cards
+- Constructed with `#111827` surface fills, framed by 1px `#1E293B` outlines.
+- **Header:** Features a 44x44px rounded tool mark, bold title (`headline-sm`), category tag, and the mono pricing badge floating top-right.
+- **Body:** Concise two-line capability brief (`body-sm`, `#94A3B8`), followed by key feature bullet tags.
+- **Footer:** Separated by a thin interior stroke (`rgba(255, 255, 255, 0.06)`). Displays user ratings, estimated monthly revenue/income potential tag, and direct access external links.
+
+### Input Fields & Global Search
+- Prominent omni-search input sits at `48px` height with a `#111827` interior fill and `#1E293B` perimeter.
+- Left-aligned with subtle search icon in `#64748B`.
+- Right-aligned keyboard shortcut hint chip (e.g., `⌘K`) rendered in `JetBrains Mono` over a muted slate container.
+- Focused state transitions border immediately to `#6366F1` with an interior accent aura: `box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2)`.
+
+### Form Controls (Checkboxes & Radios)
+- Checkboxes are `18x18px` squares with a `4px` corner radius; radios are circular.
+- Unchecked: `#1E293B` fill with `#334155` outline.
+- Checked: `#6366F1` active fill featuring a crisp white geometric check/bullet glyph.
+
+### Revenue / Monetization Blueprint Callouts
+- Specialized pedagogical modules showcasing monetization case studies.
+- Bound by an asymmetrical gradient perimeter: `linear-gradient(135deg, rgba(99, 102, 241, 0.4), rgba(139, 92, 246, 0.1))`.
+- Includes a dedicated income metric pill displaying formatted currency benchmarks (e.g., `$2.4k/mo`) set in technical mono typography.

@@ -1,0 +1,6 @@
+{
+  "name": "NextGen AI Guide",
+  "description": "Discover AI. Unlock Your Potential. Explore powerful AI tools, learn step by step, and discover practical ways to build digital skills and earn online.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
