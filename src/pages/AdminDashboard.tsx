@@ -191,8 +191,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsLoggingIn(true);
     setAuthError('');
 
+    const cleanEmail = emailInput.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase();
+    const cleanPassword = passwordInput.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
     try {
-      const res = await ToolStorageService.loginAdmin(emailInput, passwordInput);
+      const res = await ToolStorageService.loginAdmin(cleanEmail, cleanPassword);
       setIsLoggingIn(false);
 
       if (res.success) {

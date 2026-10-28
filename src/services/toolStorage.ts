@@ -996,8 +996,8 @@ export class ToolStorageService {
 
   // Login Administrator with real server verification & client cryptographic fallback for published sites
   static async loginAdmin(email: string, pass: string): Promise<{ success: boolean; message?: string; needsSetup?: boolean }> {
-    const cleanEmail = email.toLowerCase().trim();
-    const cleanPass = pass;
+    const cleanEmail = (email || '').replace(/[\u200B-\u200D\uFEFF]/g, '').toLowerCase().trim();
+    const cleanPass = (pass || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
 
     // 1. First attempt verification against server API endpoint
     try {

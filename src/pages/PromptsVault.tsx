@@ -89,8 +89,11 @@ export const PromptsVault: React.FC<PromptsVaultProps> = ({ onNavigate }) => {
     setIsLoggingIn(true);
     setLoginError('');
 
+    const cleanEmail = loginEmail.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase();
+    const cleanPassword = loginPassword.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
     try {
-      const res = await ToolStorageService.loginAdmin(loginEmail, loginPassword);
+      const res = await ToolStorageService.loginAdmin(cleanEmail, cleanPassword);
       setIsLoggingIn(false);
       if (res.success) {
         setLoginPassword('');

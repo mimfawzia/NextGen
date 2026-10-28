@@ -233,9 +233,11 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     return;
   }
 
-  const cleanEmail = email.toLowerCase().trim();
+  // Strip invisible unicode zero-width characters (e.g. \u200B-\u200D, \uFEFF) often introduced by Bengali / mobile keyboards
+  const cleanEmail = email.replace(/[\u200B-\u200D\uFEFF]/g, '').toLowerCase().trim();
+  const cleanPassword = password.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
   const isEmailMatch = cleanEmail === admin.email;
-  const isPasswordMatch = verifyPassword(password, admin.salt, admin.hash);
+  const isPasswordMatch = verifyPassword(cleanPassword, admin.salt, admin.hash);
 
   if (!isEmailMatch || !isPasswordMatch) {
     recordFailedLogin(ip);

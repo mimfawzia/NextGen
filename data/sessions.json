@@ -33,5 +33,40 @@
     "role": "admin",
     "createdAt": 1793117776403,
     "expiresAt": 1793204176403
+  },
+  "af95ebf3a8645310cdeb87a97b922bb99f28be75281a4e301db14c5f2713041e": {
+    "token": "af95ebf3a8645310cdeb87a97b922bb99f28be75281a4e301db14c5f2713041e",
+    "email": "admin@nextgenai.guide",
+    "role": "admin",
+    "createdAt": 1793172446316,
+    "expiresAt": 1793258846316
+  },
+  "0b67a22e7a5e3b2317cc5a9c3bf21fa3714ed46b72d1f59d4ddbb253f5fadab2": {
+    "token": "0b67a22e7a5e3b2317cc5a9c3bf21fa3714ed46b72d1f59d4ddbb253f5fadab2",
+    "email": "admin@nextgenai.guide",
+    "role": "admin",
+    "createdAt": 1793172464899,
+    "expiresAt": 1793258864899
+  },
+  "3cec7bd502b1110f932125c0b40cc799f59a27562aca28a936a2d88dabbcf18d": {
+    "token": "3cec7bd502b1110f932125c0b40cc799f59a27562aca28a936a2d88dabbcf18d",
+    "email": "admin@nextgenai.guide",
+    "role": "admin",
+    "createdAt": 1793172464978,
+    "expiresAt": 1793258864978
+  },
+  "b0c7473bcb3795713f6208f106a7b9c1dd37971fa7d99908438b15fd1c165666": {
+    "token": "b0c7473bcb3795713f6208f106a7b9c1dd37971fa7d99908438b15fd1c165666",
+    "email": "admin@nextgenai.guide",
+    "role": "admin",
+    "createdAt": 1793172465032,
+    "expiresAt": 1793258865032
+  },
+  "d41beee8889450465d233230b49c6ca83f6252d062f444ae9a5b106ef4c6257b": {
+    "token": "d41beee8889450465d233230b49c6ca83f6252d062f444ae9a5b106ef4c6257b",
+    "email": "admin@nextgenai.guide",
+    "role": "admin",
+    "createdAt": 1793172476284,
+    "expiresAt": 1793258876284
   }
 }
